@@ -47,6 +47,17 @@ void main() {
     expect(find.text('settings'), findsOneWidget);
   });
 
+  testWidgets('central login hides local credentials only in company mode',
+      (tester) async {
+    await pumpLogin(
+        tester,
+        MockClient((_) async =>
+            http.Response('{"company_auth":true,"google":false}', 200)));
+    expect(find.text('Continue with CompanyAuth'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Email'), findsNothing);
+    expect(find.widgetWithText(TextFormField, 'Password'), findsNothing);
+  });
+
   testWidgets('validates empty fields before making a request', (tester) async {
     var calls = 0;
     await pumpLogin(tester, MockClient((request) async {

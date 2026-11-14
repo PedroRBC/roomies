@@ -27,13 +27,19 @@ class _AuthFormState extends State<AuthForm> {
   var _factor = false;
   var _backup = false;
   var _google = false;
+  var _companyAuth = false;
   var _googleRun = 0;
   var _googlePending = false;
   @override
   void initState() {
     super.initState();
-    context.read<AppState>().api.googleAvailable().then((value) {
-      if (mounted) setState(() => _google = value);
+    context.read<AppState>().api.authConfig().then((config) {
+      if (mounted) {
+        setState(() {
+          _google = config['google'] == true;
+          _companyAuth = config['company_auth'] == true;
+        });
+      }
     }).catchError((Object _) {});
   }
 
@@ -104,7 +110,9 @@ class _AuthFormState extends State<AuthForm> {
       _error = null;
     });
     try {
-      final flow = await app.api.startGoogle();
+      final flow = _companyAuth && kIsWeb
+          ? <String, dynamic>{'url': '${app.api.baseUrl}/auth/login'}
+          : await app.api.startGoogle();
       if (!mounted || run != _googleRun) return;
       if (!await launchUrl(Uri.parse(flow['url'] as String),
           mode: kIsWeb
@@ -144,6 +152,27 @@ class _AuthFormState extends State<AuthForm> {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>().strings;
+    if (_companyAuth) {
+      return RoomiesAuthFrame(
+        strings: s,
+        onOpenSettings: () => context.go('/settings'),
+        footer: s.privacyLine,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.welcomeHome,
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 24),
+            if (_error != null) RoomiesError(_error!),
+            FilledButton(
+              onPressed: _loading ? null : _signInGoogle,
+              child: Text(s.companySignIn),
+            ),
+            if (_loading) const LinearProgressIndicator(),
+          ],
+        ),
+      );
+    }
     return RoomiesAuthFrame(
       strings: s,
       onOpenSettings: () => context.go('/settings'),

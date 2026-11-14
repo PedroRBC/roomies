@@ -1,54 +1,70 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
+	"errors"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
 	"github.com/roomies/backend/internal/config"
 	"github.com/roomies/backend/internal/middleware"
+	"github.com/roomies/backend/internal/repository"
 )
 
 type companyAuth struct {
-	cfg        *oauth2.Config
-	issuer     string
-	userinfo   string
-	endSession string
-	mu         sync.Mutex
-	states     map[string]companyState
+	cfg      oauth2.Config
+	issuer   string
+	http     *http.Client
+	mu       sync.Mutex
+	provider *oidc.Provider
+	states   map[string]companyState
 }
 type companyState struct {
-	verifier, returnTo string
-	expires            time.Time
+	verifier, nonce, returnTo string
+	expires                   time.Time
 }
 
 func newCompanyAuth(cfg *config.Config, publicURL string) (*companyAuth, error) {
-	if cfg == nil || cfg.CaldasAuthURL == "" {
+	if cfg == nil || cfg.AuthMode != "companyauth" || cfg.CaldasAuthURL == "" {
 		return nil, nil
 	}
-	base := strings.TrimRight(cfg.CaldasAuthURL, "/")
 	redirect := cfg.CaldasRedirectURL
 	if redirect == "" {
 		redirect = strings.TrimRight(publicURL, "/") + "/api/auth/callback/caldas"
 	}
 	return &companyAuth{
-		cfg: &oauth2.Config{
-			ClientID: cfg.CaldasClientID, ClientSecret: cfg.CaldasClientSecret,
-			Endpoint:    oauth2.Endpoint{AuthURL: base + "/api/auth/oauth2/authorize", TokenURL: base + "/api/auth/oauth2/token", AuthStyle: oauth2.AuthStyleInHeader},
-			RedirectURL: redirect, Scopes: []string{"openid", "profile", "email", "offline_access"},
-		},
-		issuer: base + "/api/auth", userinfo: base + "/api/auth/oauth2/userinfo", endSession: base + "/api/auth/oauth2/end-session",
+		cfg:    oauth2.Config{ClientID: cfg.CaldasClientID, ClientSecret: cfg.CaldasClientSecret, RedirectURL: redirect, Scopes: []string{"openid", "profile", "email"}},
+		issuer: strings.TrimRight(cfg.CaldasAuthURL, "/") + "/api/auth",
+		http:   &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 		states: make(map[string]companyState),
 	}, nil
 }
+
+// Discover only in company mode, when a user starts sign-in. Local installs never contact the provider.
+func (c *companyAuth) discover(ctx context.Context) (*oidc.Provider, oauth2.Config, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.provider == nil {
+		provider, err := oidc.NewProvider(oidc.ClientContext(ctx, c.http), c.issuer)
+		if err != nil {
+			return nil, oauth2.Config{}, err
+		}
+		c.provider = provider
+	}
+	cfg := c.cfg
+	cfg.Endpoint = c.provider.Endpoint()
+	cfg.Endpoint.AuthStyle = oauth2.AuthStyleInHeader
+	return c.provider, cfg, nil
+}
+
 func randomURLToken(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
@@ -57,45 +73,70 @@ func randomURLToken(n int) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 func pkceChallenge(verifier string) string {
-	h := sha256.Sum256([]byte(verifier))
-	return base64.RawURLEncoding.EncodeToString(h[:])
+	hash := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 func (h *AuthHandler) companyLogin(w http.ResponseWriter, r *http.Request) {
-	if h.company == nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+	if !h.allowedOrigin(w, r) {
 		return
 	}
-	state, verifier := randomURLToken(32), randomURLToken(32)
-	if state == "" || verifier == "" {
+	if !h.limiter.Allow("company|"+rateLimitIP(r), 20) {
+		h.tooMany(w)
+		return
+	}
+	if h.company == nil {
+		http.NotFound(w, r)
+		return
+	}
+	_, cfg, err := h.company.discover(r.Context())
+	if err != nil {
 		h.unavailable(w)
 		return
 	}
-	returnTo := r.URL.Query().Get("return_to")
-	if returnTo == "" || !strings.HasPrefix(returnTo, "/") || strings.HasPrefix(returnTo, "//") {
-		returnTo = "/"
+	state, verifier, nonce := randomURLToken(32), randomURLToken(32), randomURLToken(32)
+	if state == "" || verifier == "" || nonce == "" {
+		h.unavailable(w)
+		return
+	}
+	returnTo := "/"
+	if id := r.URL.Query().Get("native"); id != "" {
+		h.native.Lock()
+		pending := h.native.entries[id]
+		valid := pending != nil && time.Now().Before(pending.expires)
+		h.native.Unlock()
+		if !valid {
+			writeJSON(w, 400, map[string]string{"error": "sign-in expired; start again in Roomies"})
+			return
+		}
+		setCookie(w, "roomies_native", id, 300, true, h.secureCookie(r))
+		returnTo = "/api/auth/google/finish"
 	}
 	h.company.mu.Lock()
-	h.company.states[state] = companyState{verifier: verifier, returnTo: returnTo, expires: time.Now().Add(10 * time.Minute)}
+	for key, entry := range h.company.states {
+		if time.Now().After(entry.expires) {
+			delete(h.company.states, key)
+		}
+	}
+	if len(h.company.states) >= 4096 {
+		h.company.mu.Unlock()
+		h.tooMany(w)
+		return
+	}
+	h.company.states[state] = companyState{verifier: verifier, nonce: nonce, returnTo: returnTo, expires: time.Now().Add(10 * time.Minute)}
 	h.company.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{Name: "roomies_auth_state", Value: state, Path: "/api/auth", MaxAge: 600, HttpOnly: true, Secure: h.secureCookie(r), SameSite: http.SameSiteLaxMode})
-	authURL := h.company.cfg.AuthCodeURL(state, oauth2.SetAuthURLParam("code_challenge", pkceChallenge(verifier)), oauth2.SetAuthURLParam("code_challenge_method", "S256"))
+	authURL := cfg.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier))
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
-func (h *AuthHandler) CompanyCallback(w http.ResponseWriter, r *http.Request) {
-	h.companyCallback(w, r)
-}
 
-func (h *AuthHandler) companyCallback(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) CompanyCallback(w http.ResponseWriter, r *http.Request) {
 	if h.company == nil {
 		http.Error(w, "CompanyAuth is not configured", 503)
 		return
 	}
 	state := r.URL.Query().Get("state")
-	if state == "" || r.URL.Query().Get("error") != "" {
-		http.Redirect(w, r, "/?auth_error=cancelled", 303)
-		return
-	}
-	if c, err := r.Cookie("roomies_auth_state"); err != nil || c.Value != state {
+	cookie, err := r.Cookie("roomies_auth_state")
+	if state == "" || err != nil || cookie.Value != state {
 		http.Error(w, "invalid authentication state", 400)
 		return
 	}
@@ -103,65 +144,78 @@ func (h *AuthHandler) companyCallback(w http.ResponseWriter, r *http.Request) {
 	entry, ok := h.company.states[state]
 	delete(h.company.states, state)
 	h.company.mu.Unlock()
+	http.SetCookie(w, &http.Cookie{Name: "roomies_auth_state", Path: "/api/auth", MaxAge: -1, HttpOnly: true, Secure: h.secureCookie(r), SameSite: http.SameSiteLaxMode})
 	if !ok || time.Now().After(entry.expires) {
 		http.Error(w, "authentication state expired", 400)
 		return
 	}
-	token, err := h.company.cfg.Exchange(r.Context(), r.URL.Query().Get("code"), oauth2.SetAuthURLParam("code_verifier", entry.verifier))
+	if r.URL.Query().Get("error") != "" {
+		http.Redirect(w, r, "/?auth_error=cancelled", 303)
+		return
+	}
+	if r.URL.Query().Get("code") == "" {
+		http.Error(w, "missing authorization code", 400)
+		return
+	}
+	ctx := oidc.ClientContext(r.Context(), h.company.http)
+	provider, cfg, err := h.company.discover(ctx)
 	if err != nil {
-		http.Error(w, "authentication exchange failed", 502)
+		h.unavailable(w)
 		return
 	}
-	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, h.company.userinfo, nil)
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil || res.StatusCode != 200 {
-		if res != nil {
-			res.Body.Close()
-		}
-		http.Error(w, "authentication profile unavailable", 502)
+	token, err := cfg.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(entry.verifier))
+	if err != nil {
+		h.unavailable(w)
 		return
 	}
-	defer res.Body.Close()
+	rawIDToken, _ := token.Extra("id_token").(string)
+	idToken, err := provider.VerifierContext(ctx, &oidc.Config{ClientID: cfg.ClientID}).Verify(ctx, rawIDToken)
+	if err != nil || idToken.Nonce != entry.nonce || idToken.Subject == "" {
+		http.Error(w, "invalid identity token", 401)
+		return
+	}
+	if idToken.AccessTokenHash != "" && idToken.VerifyAccessToken(token.AccessToken) != nil {
+		http.Error(w, "invalid access token", 401)
+		return
+	}
+	// Profile claims need not be included in the ID token. Fetch them from the
+	// discovered userinfo endpoint, bound to the same verified identity.
+	info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
+	if err != nil {
+		h.unavailable(w)
+		return
+	}
+	if info.Subject != idToken.Subject {
+		http.Error(w, "invalid authentication profile", 401)
+		return
+	}
 	var profile struct {
-		Sub   string `json:"sub"`
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	if json.NewDecoder(res.Body).Decode(&profile) != nil || profile.Sub == "" || profile.Email == "" {
-		http.Error(w, "invalid authentication profile", 502)
+	if info.Claims(&profile) != nil || strings.TrimSpace(profile.Email) == "" {
+		http.Error(w, "invalid authentication profile", 401)
 		return
 	}
 	if profile.Name == "" {
 		profile.Name = strings.Split(profile.Email, "@")[0]
 	}
-	user, err := h.userRepo.UpsertCompanyUser(r.Context(), profile.Sub, profile.Name, strings.ToLower(strings.TrimSpace(profile.Email)))
+	user, err := h.userRepo.UpsertCompanyUser(ctx, idToken.Subject, profile.Name, strings.ToLower(strings.TrimSpace(profile.Email)))
+	if errors.Is(err, repository.ErrCompanyAccountConflict) {
+		writeJSON(w, 409, map[string]string{"error": "this email belongs to another account; use the original sign-in method"})
+		return
+	}
 	if err != nil {
 		h.unavailable(w)
 		return
 	}
-	session, err := h.auth.CreateLocalSession(r.Context(), user.ID, r)
+	session, err := h.auth.CreateLocalSession(ctx, user.ID, r)
 	if err != nil {
 		h.unavailable(w)
 		return
 	}
+	defer session.Body.Close()
 	copyAuthCookies(w, session)
 	setCookie(w, middleware.SessionHintCookieName, "1", 8*60*60, false, h.secureCookie(r))
 	http.Redirect(w, r, entry.returnTo, 303)
-}
-
-// Keep the identity provider's logout endpoint available for clients that want global sign-out.
-func (h *AuthHandler) companyLogoutURL(r *http.Request) string {
-	if h.company == nil || h.company.endSession == "" {
-		return ""
-	}
-	u, err := url.Parse(h.company.endSession)
-	if err != nil {
-		return ""
-	}
-	q := u.Query()
-	q.Set("post_logout_redirect_uri", strings.TrimRight(h.publicBaseURL, "/")+"/")
-	q.Set("client_id", h.company.cfg.ClientID)
-	u.RawQuery = q.Encode()
-	return u.String()
 }

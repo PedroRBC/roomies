@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -59,25 +61,29 @@ func (r *UserRepository) GetByAuthSub(ctx context.Context, sub string) (*models.
 	return &user, nil
 }
 
+var ErrCompanyAccountConflict = errors.New("email is already in use by a different account")
+
 func (r *UserRepository) UpsertCompanyUser(ctx context.Context, sub, name, email string) (*models.User, error) {
 	user, err := r.GetByAuthSub(ctx, sub)
 	if err == nil {
-		_, err = r.db.ExecContext(ctx, "UPDATE users SET name=$1, email=$2, email_verified=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=$3", name, email, user.ID)
+		_, err = r.db.ExecContext(ctx, "UPDATE users SET name=$1, email=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3", name, email, user.ID)
 		if err != nil {
 			return nil, err
 		}
 		return r.GetByID(ctx, user.ID)
 	}
-	user, err = r.GetByEmail(ctx, email)
-	if err == nil {
-		_, err = r.db.ExecContext(ctx, "UPDATE users SET auth_sub=$1, name=$2, email_verified=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=$3", sub, name, user.ID)
-		if err != nil {
-			return nil, err
-		}
-		return r.GetByID(ctx, user.ID)
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	// Email is mutable and must never link a central identity to an existing local account.
+	if _, err = r.GetByEmail(ctx, email); err == nil {
+		return nil, ErrCompanyAccountConflict
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
 	id := models.NewID()
-	_, err = r.db.ExecContext(ctx, "INSERT INTO users (id,name,email,password_hash,auth_sub,email_verified,created_at,updated_at) VALUES ($1,$2,$3,'',$4,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", id, name, email, sub)
+	_, err = r.db.ExecContext(ctx, "INSERT INTO users (id,name,email,password_hash,auth_sub,created_at,updated_at) VALUES ($1,$2,$3,'',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", id, name, email, sub)
 	if err != nil {
 		return nil, err
 	}
