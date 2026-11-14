@@ -55,12 +55,15 @@ export function Dashboard({
 }) {
   const { t, preferences, setPreference } = usePreferences();
   const [showCreate, setShowCreate] = useState(createRequested);
+  const [previousCreateRequested, setPreviousCreateRequested] =
+    useState(createRequested);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const house = houses.find((item) => item.id === selected) ?? houses[0];
-  useEffect(() => {
+  if (createRequested !== previousCreateRequested) {
+    setPreviousCreateRequested(createRequested);
     setShowCreate(createRequested);
-  }, [createRequested]);
+  }
   async function create(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
