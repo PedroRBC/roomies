@@ -624,3 +624,11 @@ it("removes editing controls immediately when a role becomes monitor", async () 
     screen.getByRole("table", { name: "Current splits" }),
   ).toBeInTheDocument();
 });
+
+it("shows an absolute personal balance with a clear debt label", async () => {
+  render(<PreferencesProvider><Balances {...props} user={{ id: "bea", name: "Bea", email: "bea@example.com" }} /></PreferencesProvider>);
+  const balance = await screen.findByRole("region", { name: "Your balance" });
+  expect(balance).toHaveTextContent("$5.00");
+  expect(balance).toHaveTextContent("You owe");
+  expect(balance).not.toHaveTextContent("-$5.00");
+});

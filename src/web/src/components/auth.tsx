@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { SubmitEvent } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Receipt, Wallet, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 import { Field } from "./field";
 import { api } from "@/lib/api";
 import { usePreferences } from "@/lib/preferences";
@@ -84,11 +85,21 @@ export function Auth({
     }
   }
   return (
-    <div className="flex flex-1 items-center justify-center px-7 py-10">
-      <div className="w-full max-w-[380px]">
+    <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-5 py-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16 lg:py-16">
+      <section className="hidden min-w-0 lg:block" aria-label="Roomies">
+        <div className="roomies-wordmark mb-8 text-4xl">Roomies</div>
+        <p className="font-heading text-5xl font-semibold leading-tight tracking-tight">{t("A home runs better together.", "Uma casa funciona melhor em conjunto.", "Un hogar funciona mejor en equipo.")}</p>
+        <p className="mt-5 text-lg leading-relaxed text-muted-foreground">{t("Bring the things you share into one place.", "Reúna tudo o que vocês compartilham em um só lugar.", "Reúne todo lo que compartís en un solo lugar.")}</p>
+        <ul className="mt-9 grid gap-5 text-sm">
+          <li className="flex items-center gap-3"><Receipt className="size-5 text-primary" aria-hidden="true" />{t("Keep shared expenses together", "Organize as despesas compartilhadas", "Organiza los gastos compartidos")}</li>
+          <li className="flex items-center gap-3"><Wallet className="size-5 text-primary" aria-hidden="true" />{t("Know who owes what", "Saiba quem deve o quê", "Sabe quién debe qué")}</li>
+          <li className="flex items-center gap-3"><StickyNote className="size-5 text-primary" aria-hidden="true" />{t("Leave a note for your roommates", "Deixe uma nota para os moradores", "Deja una nota a tus compañeros")}</li>
+        </ul>
+      </section>
+      <Card className="mx-auto w-full max-w-[440px] gap-0 p-6 sm:p-8">
         <div className="mb-9 text-center">
-          <h1 className="roomies-wordmark text-[52px]">Roomies</h1>
-          <h2 className="mt-5 text-2xl font-bold">
+          <div className="roomies-wordmark text-[52px] lg:hidden">Roomies</div>
+          <h1 className="mt-5 font-heading text-3xl font-semibold lg:mt-0">
             {factor
               ? t(
                   "Two-factor authentication",
@@ -102,7 +113,7 @@ export function Auth({
                     "Siéntete en casa",
                   )
                 : t("Welcome home", "Bem-vindo ao lar", "Bienvenido a casa")}
-          </h2>
+          </h1>
           <p className="mt-3.5 text-base text-muted-foreground">
             {factor
               ? t(
@@ -192,7 +203,7 @@ export function Auth({
                       className="pr-12"
                     />
                     <Button
-                      className="absolute right-1 bottom-0.5"
+                      className="absolute right-1 bottom-1"
                       type="button"
                       size="icon"
                       variant="ghost"
@@ -305,7 +316,7 @@ export function Auth({
             </>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

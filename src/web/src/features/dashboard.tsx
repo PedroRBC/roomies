@@ -82,7 +82,7 @@ export function Dashboard({
     }
   }
   return (
-    <section className="mx-auto w-full max-w-[720px]">
+    <section className="mx-auto w-full max-w-[1040px]">
       <div className="roomies-page-heading mb-4">
         <h1 className="roomies-page-title">
           {t(`Hi, ${user.name}`, `Olá, ${user.name}`, `Hola, ${user.name}`)}
@@ -279,8 +279,8 @@ function SummaryView({
   );
   const note = summary.notes[index % summary.notes.length];
   return (
-    <div className="grid gap-8 py-2">
-      <Card className="gap-2">
+    <div className="grid min-w-0 gap-6 py-2 xl:grid-cols-2">
+      <Card className="min-w-0 gap-2 xl:first:col-span-2">
         <CardHeader>
           <CardTitle className="font-sans text-base font-semibold">
             {t("This month", "Gastos do mês", "Este mes")}
@@ -297,7 +297,7 @@ function SummaryView({
             </p>
           ) : (
             <>
-              <p className="mb-4 font-heading text-[22px] leading-[1.2] font-semibold text-[var(--accent-deep)] tabular-nums">
+              <p className="mb-6 rounded-xl bg-primary p-6 font-heading text-4xl leading-tight font-semibold text-primary-foreground tabular-nums">
                 {t("Total:", "Total:", "Total:")} {money(cents / 100)}
               </p>
               <div
@@ -356,7 +356,7 @@ function SummaryView({
           )}
         </CardContent>
       </Card>
-      <Card className="gap-2">
+      <Card className="min-w-0 gap-2 xl:first:col-span-2">
         <CardHeader>
           <CardTitle className="font-sans text-base font-semibold">
             {t("Upcoming", "Próximos", "Próximos")}
@@ -406,7 +406,7 @@ function SummaryView({
         </CardContent>
       </Card>
       <Card
-        className="gap-2"
+        className="min-w-0 gap-2"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocusCapture={() => setPaused(true)}

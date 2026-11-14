@@ -130,7 +130,7 @@ export function HouseWorkspace({
   };
   const Section = sections[tab];
   return (
-    <section aria-label={loaded.house.name} className="grid gap-7">
+    <section aria-label={loaded.house.name} className="grid min-w-0 gap-7">
       <Suspense
         fallback={
           <p role="status">

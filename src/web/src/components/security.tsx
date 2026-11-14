@@ -35,7 +35,7 @@ export function Security({ user, onChange }: { user: User; onChange: (user: User
     finally { setBusy(false); }
   }
   return <Card className="mb-6 max-w-xl">
-    <CardHeader><CardTitle>Two-factor authentication</CardTitle><CardDescription>{user.two_factor_enabled ? "Your account is protected by an authenticator app." : "Add a second step to sign in with an app such as Google Authenticator, 1Password or Aegis."}</CardDescription></CardHeader>
+    <CardHeader><CardTitle><h2>Two-factor authentication</h2></CardTitle><CardDescription>{user.two_factor_enabled ? "Your account is protected by an authenticator app." : "Add a second step to sign in with an app such as Google Authenticator, 1Password or Aegis."}</CardDescription></CardHeader>
     <CardContent className="grid gap-4">
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       <form onSubmit={submit} aria-busy={busy}>
