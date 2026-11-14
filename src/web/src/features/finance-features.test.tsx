@@ -296,6 +296,7 @@ it("keeps note text on failed create and trims a successful retry", async () => 
   });
   const actor = userEvent.setup();
   show(Notes);
+  await actor.click(screen.getByText("New note"));
   await actor.type(screen.getByLabelText("Title"), " Reminder ");
   await actor.type(screen.getByLabelText("Content"), " Buy soap ");
   await actor.click(screen.getByRole("button", { name: "Save note" }));
@@ -476,6 +477,7 @@ it("ignores late mutation completion after a house switch", async () => {
   );
   const actor = userEvent.setup();
   const view = show(Notes);
+  await actor.click(screen.getByText("New note"));
   await actor.type(screen.getByLabelText("Title"), "Old draft");
   await actor.type(screen.getByLabelText("Content"), "Old content");
   await actor.click(screen.getByRole("button", { name: "Save note" }));

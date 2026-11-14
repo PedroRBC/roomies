@@ -1,6 +1,7 @@
 import type { Member, User } from "./api";
 export interface FeatureProps {
   houseId: string;
+  quickCreate?: boolean;
   user: User;
   role: string | null;
   members: Member[];

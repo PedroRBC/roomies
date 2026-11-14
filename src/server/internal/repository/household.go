@@ -538,3 +538,10 @@ func requireVersionedRow(ctx context.Context, tx *sqlx.Tx, res sql.Result, table
 	}
 	return ErrVersionConflict
 }
+
+// ListHouseCompletions groups recorded actions by completion time, not chore due date.
+func (r *HouseholdRepository) ListHouseCompletions(ctx context.Context, houseID string, from, to time.Time) ([]models.ChoreCompletion, error) {
+	out := []models.ChoreCompletion{}
+	err := r.db.SelectContext(ctx, &out, `SELECT id,chore_id,house_id,occurrence_at,completed_by,completed_at FROM chore_completions WHERE house_id=$1 AND completed_at >= $2 AND completed_at < $3 ORDER BY completed_at DESC,id`, houseID, from, to)
+	return out, err
+}

@@ -37,18 +37,23 @@ function NotesHouse(props: FeatureProps) {
   }
   return (
     <section aria-label={t("Notes", "Notas", "Notas")} className="grid gap-5">
-      <h2 className="roomies-page-title">{t("Notes", "Notas", "Notas")}</h2>
+      <h2 className="font-heading text-2xl font-semibold">
+        {t("Notes", "Notas", "Notas")}
+      </h2>
       {canCreate(props.role) ? (
-        <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
-          <CardHeader className="px-5">
-            <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
-              <h3>{t("New note", "Nova nota", "Nueva nota")}</h3>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5">
-            <NoteForm {...props} onSaved={changed} />
-          </CardContent>
-        </Card>
+        <details
+          open={props.quickCreate || undefined}
+          className="rounded-xl border p-4"
+        >
+          <summary className="cursor-pointer font-semibold text-primary">
+            {t("New note", "Nova nota", "Nueva nota")}
+          </summary>
+          <div className="pt-4">
+            <CardContent className="px-5">
+              <NoteForm {...props} onSaved={changed} />
+            </CardContent>
+          </div>
+        </details>
       ) : (
         <p>
           {t(
@@ -68,7 +73,7 @@ function NotesHouse(props: FeatureProps) {
       ) : (
         resource.data?.map((note) => (
           <article key={note.id}>
-            <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
+            <Card className="gap-0 border-0 border-b bg-transparent py-4 shadow-none ring-0">
               <CardHeader className="px-5">
                 <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
                   <h3>{note.title}</h3>

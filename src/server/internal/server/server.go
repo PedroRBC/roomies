@@ -131,6 +131,8 @@ func NewHandler(deps Dependencies) http.Handler {
 				r.Get("/", houseHandler.Get)
 				r.Put("/", houseHandler.Update)
 				r.Get("/events", eventsHandler.List)
+				r.Get("/chore-completions", householdHandler.ListHouseCompletions)
+				r.Get("/agenda", householdHandler.Agenda)
 				r.Get("/notification-preferences", notificationHandler.GetPreferences)
 				r.Put("/notification-preferences", notificationHandler.PutPreferences)
 				r.Route("/notification-subscriptions", func(r chi.Router) {

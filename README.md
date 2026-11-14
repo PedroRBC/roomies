@@ -177,7 +177,7 @@ Open <http://localhost:8080/> and sign up with any email and password. This star
 
 ### Alternative web client
 
-The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy and uses HttpOnly cookie sessions. It supports email/password, optional Google OAuth and authenticator 2FA, invitations, house switching and administration, expense splits and privacy, balances and settlement suggestions, notes, groceries, chores, calendar, notification preferences, scheduled reminders, and browser Web Push. The dashboard shows monthly spending, upcoming items, and rotating notes. Settings include English, Portuguese and Spanish, display currency, appearance, mint or plum accent, and a default house. Currency settings change formatting; they do not convert amounts.
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy and uses HttpOnly cookie sessions. It supports email/password, optional Google OAuth and authenticator 2FA, invitations, house switching and administration, expense splits and privacy, balances and settlement suggestions, notes, groceries, chores, calendar, notification preferences, scheduled reminders, and browser Web Push. The React client has three workspaces: Today (agenda, an editable shopping list, quick task panels and house notes), Money (a compact expense ledger, balances, and optional daily/category/six-month spending charts), and Household (shopping, chores, calendar and the noticeboard). Small actions open alongside the current workspace; members, notifications and account settings use side panels. Chore, event and note creation forms expand on request. The agenda expands calendar and enabled chore recurrences for the next 31 days, includes events in progress, excludes completed chore occurrences, and shows the first six entries alongside upcoming reminders. Financial charts default to shared expenses and offer a separate scope for expenses visible to the current member, with accessible data tables. Today refreshes every minute while visible and when the window regains focus. Balance suggestions cover all shared expenses; payments are not recorded. Settings include English, Portuguese and Spanish, display currency, appearance, mint or plum accent, and a default house. Currency settings change formatting; they do not convert amounts.
 
 Select the alternative on the same origin and port as Flutter (only one can use that port):
 
@@ -193,7 +193,18 @@ docker compose stop web-vite
 docker compose up --build -d web
 ```
 
+For React development with hot reload, use the same origin and port instead of either built client:
+
+```sh
+docker compose stop web web-vite
+docker compose up --build -d web-dev
+```
+
+Open <http://localhost:8080/> (or your configured `HTTP_PORT`). Edits under `src/web/` reload automatically; restart `web-dev` after dependency or Vite configuration changes. The Vite proxy verifies the API certificate against the local CA. Stop `web-dev` before switching back to `web` or `web-vite`.
+
 The alternative is built locally; the published self-hosting image above continues to serve Flutter.
+
+The dashboard can create bounded daily, weekly, or monthly reminders using the existing server worker. Notification delivery requires member preferences and configured channels; the daily digest groups notifications rather than generating a financial report. `GET /api/houses/{id}/agenda` requires house membership and returns up to 200 calendar/chore occurrences with an explicit truncation flag. `GET /api/houses/{id}/chore-completions?from=YYYY-MM-DD&to=YYYY-MM-DD` requires house membership, uses an inclusive `from` and exclusive `to` in UTC, and accepts up to 366 days.
 
 House sections support deep links: `/house/{id}?tab=expenses` (also `notes`, `groceries`, `chores`, `calendar`, `balances`, `notifications`, and `members`). Invitations use `/accept-invitation?token=...`; `/dashboard?create=1` opens house creation. Browser push requires HTTPS or localhost, notification permission, and configured server Web Push keys. Neither client moves money when suggesting settlements.
 
