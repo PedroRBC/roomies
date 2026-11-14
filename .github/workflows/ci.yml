@@ -96,17 +96,6 @@ jobs:
       - name: Build the alternative web image
         run: docker compose build web-vite
 
-  auth:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check Better Auth against PostgreSQL
-        run: docker compose run --build --rm test-auth
-      - name: Build authentication image
-        run: docker compose build auth
-      - if: failure()
-        run: docker compose logs
-
   android:
     runs-on: ubuntu-latest
     defaults:
@@ -250,7 +239,6 @@ jobs:
       - name: Build images
         run: |
           docker build -t ghcr.io/jobucaldas/roomies-backend:nightly src/server
-          docker build -t ghcr.io/jobucaldas/roomies-auth:nightly src/auth
           docker build --target prebuilt -t ghcr.io/jobucaldas/roomies-frontend:nightly src/app
       - name: Run the README compose file
         run: |
@@ -276,7 +264,7 @@ jobs:
   ghcr-images:
     name: GHCR images (nightly + datetime_sha)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [pre-commit, lint, backend, flutter, auth, images]
+    needs: [pre-commit, lint, backend, flutter, images]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -317,16 +305,6 @@ jobs:
             ghcr.io/${{ steps.tags.outputs.owner }}/roomies-backend:nightly
             ghcr.io/${{ steps.tags.outputs.owner }}/roomies-backend:dev
             ghcr.io/${{ steps.tags.outputs.owner }}/roomies-backend:${{ steps.tags.outputs.datetime_sha }}
-      - name: Build and push authentication
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: src/auth
-          file: src/auth/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ steps.tags.outputs.owner }}/roomies-auth:nightly
-            ghcr.io/${{ steps.tags.outputs.owner }}/roomies-auth:dev
-            ghcr.io/${{ steps.tags.outputs.owner }}/roomies-auth:${{ steps.tags.outputs.datetime_sha }}
       - name: Build and push frontend
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
