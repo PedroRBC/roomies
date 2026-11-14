@@ -10,7 +10,7 @@ bin/
 env/
 
 # Dependencies
-src/backend/vendor/
+src/server/vendor/
 node_modules/
 **/node_modules/
 
@@ -45,6 +45,7 @@ Thumbs.db
 # Coverage
 coverage.out
 *.html
-!src/frontend/web/index.html
+!src/app/web/index.html
+!src/web/index.html
 
 .worktrees/

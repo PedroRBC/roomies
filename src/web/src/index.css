@@ -1,0 +1,274 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/source-sans-3";
+@import "@fontsource-variable/fraunces";
+
+/* shadcn state variants for the installed Base UI components. */
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+@custom-variant data-checked (&:where([data-state="checked"], [data-checked]:not([data-checked="false"])));
+@custom-variant data-unchecked (&:where([data-state="unchecked"], [data-unchecked]:not([data-unchecked="false"])));
+@custom-variant data-disabled (&:where([data-state="disabled"], [data-disabled]:not([data-disabled="false"])));
+@custom-variant data-active (&:where([data-state="active"], [data-active]:not([data-active="false"])));
+@custom-variant data-selected (&:where([data-selected="true"]));
+@custom-variant data-horizontal (&:where([data-orientation="horizontal"]));
+@custom-variant data-vertical (&:where([data-orientation="vertical"]));
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: "Fraunces Variable", serif;
+  --font-sans: "Source Sans 3 Variable", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #f5f5f4;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+  --primary: #0f7f5c;
+  --primary-foreground: #ffffff;
+  --accent-deep: #0d7353;
+  --secondary: #dcf1e8;
+  --secondary-foreground: #0b5940;
+  --muted: #edebe9;
+  --muted-foreground: #57534e;
+  --accent: #dcf1e8;
+  --accent-foreground: #0b5940;
+  --destructive: #b42318;
+  --danger-soft: #fce8e6;
+  --border: #e2dfdc;
+  --input: var(--border);
+  --surface-raised: #ffffff;
+  --ring: var(--primary);
+  --chart-1: var(--primary);
+  --chart-2: var(--accent-deep);
+  --chart-3: var(--muted-foreground);
+  --chart-4: var(--accent);
+  --chart-5: var(--muted);
+  --radius: 0.75rem;
+  --card-shadow: 0 2px 12px #1c19170f;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+:root[data-accent="plum"] {
+  --primary: #53134b;
+  --accent-deep: #6e2264;
+  --accent: #f2e6f0;
+  --accent-foreground: #4a1143;
+  --secondary: var(--accent);
+  --secondary-foreground: var(--accent-foreground);
+}
+.dark {
+  --background: #121212;
+  --foreground: #f5f5f5;
+  --card: #1c1c1c;
+  --popover: #242424;
+  --primary: #21c68f;
+  --primary-foreground: #062419;
+  --accent-deep: #5fd6a8;
+  --accent: #17392d;
+  --accent-foreground: #b4efd7;
+  --secondary: var(--accent);
+  --secondary-foreground: var(--accent-foreground);
+  --muted: #2a2a2a;
+  --muted-foreground: #b8b8b8;
+  --destructive: #fb7185;
+  --danger-soft: #3a1c1f;
+  --border: #333333;
+  --surface-raised: #242424;
+  --card-shadow: none;
+}
+.dark[data-accent="plum"] {
+  --primary: #d38ac7;
+  --primary-foreground: #2a0a26;
+  --accent-deep: #e3a6d8;
+  --accent: #3d1b39;
+  --accent-foreground: #f5d7ef;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.45;
+  }
+  h1 {
+    font-family: var(--font-heading);
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+.roomies-wordmark {
+  font-family: var(--font-heading);
+  color: var(--accent-deep);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.roomies-page-title {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+}
+.roomies-page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.roomies-empty {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+.roomies-nav-item {
+  color: var(--foreground);
+  min-height: 48px;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.roomies-nav-item[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-weight: 700;
+}
+.roomies-nav-item svg {
+  width: 20px;
+  height: 20px;
+  color: var(--muted-foreground);
+}
+.roomies-nav-item[aria-current="page"] svg {
+  color: inherit;
+}
+.roomies-auth-field {
+  position: relative;
+}
+.roomies-auth-field input {
+  height: 56px;
+  padding: 20px 16px 8px;
+}
+.roomies-auth-field label {
+  position: absolute;
+  top: 5px;
+  left: 16px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  z-index: 1;
+}
+
+.roomies-dashboard-greeting {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+.roomies-dashboard-actions {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+}
+.roomies-dashboard-actions > button:first-child {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.roomies-dashboard-stat {
+  display: grid;
+  gap: 0.1rem;
+  border-top: 2px solid var(--border);
+  padding: 0.85rem 0.15rem 0.35rem;
+}
+.roomies-dashboard-stat span {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.roomies-dashboard-stat strong {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.roomies-dashboard-stat small {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}
+.roomies-dashboard-note,
+.roomies-dashboard-shopping {
+  min-width: 0;
+}

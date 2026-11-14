@@ -30,7 +30,7 @@ jobs:
         with:
           go-version: '1.26.8'
       - run: go vet ./...
-        working-directory: src/backend
+        working-directory: src/server
         env:
           GOTOOLCHAIN: local
 
@@ -50,7 +50,7 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
-        working-directory: src/backend
+        working-directory: src/server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -59,17 +59,15 @@ jobs:
       - run: go test ./...
         env:
           DATABASE_URL: sqlite://ci.db
-          JWT_SECRET: ci-only-secret
       - run: go test ./...
         env:
           DATABASE_URL: postgres://roomies:roomies@localhost:5432/roomies?sslmode=disable
-          JWT_SECRET: ci-only-secret
 
   flutter:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -86,14 +84,23 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
           retention-days: 3
+
+  vite-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint, test and build the alternative web client
+        run: docker compose run --build --rm --no-deps test-web
+      - name: Build the alternative web image
+        run: docker compose build web-vite
 
   android:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -140,7 +147,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-android-apk-${{ github.sha }}
-          path: src/frontend/build/app/outputs/flutter-apk/app-release.apk
+          path: src/app/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -149,7 +156,7 @@ jobs:
     runs-on: windows-2022
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -161,7 +168,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-windows-x64-${{ github.sha }}
-          path: src/frontend/build/windows/x64/runner/Release/
+          path: src/app/build/windows/x64/runner/Release/
           if-no-files-found: error
           retention-days: 14
 
@@ -181,11 +188,11 @@ jobs:
             https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage
           chmod +x "$RUNNER_TEMP/appimagetool"
       - run: flutter pub get
-        working-directory: src/frontend
+        working-directory: src/app
       - run: flutter build linux --release --dart-define=ROOMIES_API_URL=
-        working-directory: src/frontend
+        working-directory: src/app
       - name: Package AppImage
-        working-directory: src/frontend/build/linux
+        working-directory: src/app/build/linux
         env:
           APPIMAGETOOL: ${{ runner.temp }}/appimagetool
           # Runners have no FUSE; unpack appimagetool instead of mounting it.
@@ -213,7 +220,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-linux-appimage-${{ github.sha }}
-          path: src/frontend/build/linux/Roomies-x86_64.AppImage
+          path: src/app/build/linux/Roomies-x86_64.AppImage
           if-no-files-found: error
           retention-days: 14
 
@@ -226,30 +233,32 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
       - name: Development compose config
         run: docker compose config -q
       - name: Build images
         run: |
-          docker build -t ghcr.io/jobucaldas/roomies-backend:nightly src/backend
-          docker build --target prebuilt -t ghcr.io/jobucaldas/roomies-frontend:nightly src/frontend
+          docker build -t ghcr.io/jobucaldas/roomies-backend:nightly src/server
+          docker build --target prebuilt -t ghcr.io/jobucaldas/roomies-frontend:nightly src/app
       - name: Run the README compose file
         run: |
           mkdir smoke
           awk '/^```yaml$/{f=1;next} /^```$/{f=0} f' README.md > smoke/compose.yaml
-          printf '%s\n' POSTGRES_PASSWORD="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 48)" \
+          printf '%s\n' POSTGRES_PASSWORD="$(openssl rand -hex 24)" BETTER_AUTH_SECRET="$(openssl rand -hex 48)" \
             ROOMIES_PUBLIC_BASE_URL=http://localhost:8080 > smoke/.env
           cd smoke
           docker compose pull db
           docker compose up -d --pull never
           timeout 120 sh -c 'until curl -fsS http://localhost:8080/ >/dev/null; do sleep 2; done'
           for _ in $(seq 1 60); do
-            [ "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me)" = 401 ] && break
+            code="$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me || true)"
+            [ "$code" = 401 ] && break
             sleep 2
           done
-          test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me)" = 401
+          code="$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/me || true)"
+          test "$code" = 401
           curl -fsS http://localhost:8080/some/deep/link | grep -qi '<html'
-          test "$(docker compose ps --status running -q | wc -l)" = 4
+          test "$(docker compose ps --status running -q | wc -l)" = 5
       - if: failure()
         run: cd smoke && docker compose logs
 
@@ -267,7 +276,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
       - name: Compute image tags
         id: tags
         env:
@@ -291,8 +300,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: src/backend
-          file: src/backend/Dockerfile
+          context: src/server
+          file: src/server/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ steps.tags.outputs.owner }}/roomies-backend:nightly
@@ -301,7 +310,7 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: src/frontend
+          context: src/app
           target: prebuilt
           push: true
           tags: |

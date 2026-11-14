@@ -1,0 +1,72 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../features/houses/accept_invitation_screen.dart';
+import '../features/dashboard/dashboard_screen.dart';
+import '../features/houses/house_screen.dart';
+import '../features/auth/login_screen.dart';
+import '../features/auth/register_screen.dart';
+import '../features/settings/settings_screen.dart';
+import 'app_state.dart';
+
+GoRouter createRouter(AppState appState) {
+  return GoRouter(
+    refreshListenable: appState,
+    initialLocation: '/',
+    redirect: (context, state) async {
+      if (!appState.sessionReady) return null;
+      final path = state.uri.path;
+      final authed = appState.api.isAuthenticated;
+      final public = path == '/' ||
+          path == '/register' ||
+          path == '/accept-invitation' ||
+          // Language and appearance are reachable before signing in.
+          path == '/settings';
+      if (!authed && !public) return '/';
+      if (authed && (path == '/' || path == '/register')) {
+        final invitation = await appState.api.loadPendingInvitation();
+        if (invitation != null && invitation.isNotEmpty) {
+          return '/accept-invitation';
+        }
+        // Fresh password login always goes to Dashboard via explicit
+        // navigation. Restored sessions prefer the default house when set.
+        return appState.restoredHomePath() ?? '/dashboard';
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/accept-invitation',
+        builder: (context, state) => AcceptInvitationScreen(
+          initialToken: state.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
+        path: '/dashboard',
+        builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/house/:id',
+        builder: (context, state) => HouseScreen(
+          houseId: state.pathParameters['id']!,
+          initialTab: state.uri.queryParameters['tab'],
+        ),
+      ),
+    ],
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(child: Text(state.error.toString())),
+    ),
+  );
+}
