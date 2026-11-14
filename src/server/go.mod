@@ -1,6 +1,6 @@
 module github.com/roomies/backend
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/go-chi/chi/v5 v5.2.1
@@ -11,6 +11,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/teambition/rrule-go v1.8.2
+	golang.org/x/crypto v0.59.0
 	golang.org/x/oauth2 v0.27.0
 )
 

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/roomies/backend/internal/betterauth"
 	roomiesclock "github.com/roomies/backend/internal/clock"
 	"github.com/roomies/backend/internal/config"
@@ -81,7 +82,7 @@ func run(logger *slog.Logger, args []string) error {
 
 	switch command {
 	case "serve":
-		return runServer(ctx, logger, cfg, clk, userRepo, houseRepo, expenseRepo, noteRepo, reliabilityRepo, notificationRepo, householdRepo)
+		return runServer(ctx, logger, cfg, db, clk, userRepo, houseRepo, expenseRepo, noteRepo, reliabilityRepo, notificationRepo, householdRepo)
 	case "worker":
 		return runWorker(ctx, logger, cfg, userRepo, reliabilityRepo, notificationRepo, householdRepo, deliveryCipher)
 	default:
@@ -89,13 +90,13 @@ func run(logger *slog.Logger, args []string) error {
 	}
 }
 
-func runServer(ctx context.Context, logger *slog.Logger, cfg *config.Config, clk roomiesclock.Clock,
+func runServer(ctx context.Context, logger *slog.Logger, cfg *config.Config, db *sqlx.DB, clk roomiesclock.Clock,
 	userRepo *repository.UserRepository, houseRepo *repository.HouseRepository,
 	expenseRepo *repository.ExpenseRepository, noteRepo *repository.NoteRepository,
 	reliabilityRepo *repository.ReliabilityRepository, notificationRepo *repository.NotificationRepository,
 	householdRepo *repository.HouseholdRepository,
 ) error {
-	authClient, err := betterauth.NewClient(cfg.AuthURL, cfg.AuthCAFile)
+	authClient, err := betterauth.NewLocalClient(db, cfg)
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}

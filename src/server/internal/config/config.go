@@ -47,8 +47,12 @@ type Config struct {
 	WebPushSubject              string
 	FCMProjectID                string
 	FCMCredentialsFile          string
-	AuthURL                     string
-	AuthCAFile                  string
+	BetterAuthSecret            string
+	GoogleClientID              string
+	GoogleClientSecret          string
+	// Deprecated compatibility fields; authentication is now hosted by Go.
+	AuthURL    string
+	AuthCAFile string
 }
 
 func Load() *Config {
@@ -81,8 +85,9 @@ func Load() *Config {
 		WebPushSubject:              getEnv("WEB_PUSH_SUBJECT", "mailto:no-reply@roomies.local"),
 		FCMProjectID:                strings.TrimSpace(os.Getenv("FCM_PROJECT_ID")),
 		FCMCredentialsFile:          strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")),
-		AuthURL:                     getEnv("AUTH_URL", "https://auth:3000"),
-		AuthCAFile:                  strings.TrimSpace(os.Getenv("AUTH_CA_FILE")),
+		BetterAuthSecret:            strings.TrimSpace(os.Getenv("BETTER_AUTH_SECRET")),
+		GoogleClientID:              strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID")),
+		GoogleClientSecret:          strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET")),
 	}
 }
 
@@ -92,6 +97,9 @@ func (c *Config) Validate() error {
 		if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Hostname()))) {
 			return errors.New("AUTH_URL must use https except on localhost and contain only an origin")
 		}
+	}
+	if (c.GoogleClientID == "") != (c.GoogleClientSecret == "") {
+		return errors.New("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be provided together")
 	}
 	if c.Environment == "production" {
 		for _, origin := range c.CORSAllowedOrigins {
