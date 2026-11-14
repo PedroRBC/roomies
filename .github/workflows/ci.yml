@@ -89,6 +89,15 @@ jobs:
           path: src/app/build/web
           retention-days: 3
 
+  vite-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint, test and build the alternative web client
+        run: docker compose run --build --rm --no-deps test-web
+      - name: Build the alternative web image
+        run: docker compose build web-vite
+
   android:
     runs-on: ubuntu-latest
     defaults:

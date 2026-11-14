@@ -3,7 +3,7 @@
 Roomies is a roommate-management app for shared expenses, notes, balances, settlements, and house-scoped household workflows.
 
 ## Codebase facts
-- Client: Flutter under `src/app/` (web, Android, Windows, Linux).
+- Clients: Flutter under `src/app/` (web, Android, Windows, Linux); alternative Vite + React web client under `src/web/`, using shadcn/ui and Tailwind CSS v4.
 - Flutter layout: `lib/app/` for composition, routing and state; `lib/core/` for shared infrastructure; `lib/shared/` for reusable UI; `lib/features/` for product flows. Tests mirror these folders.
 - Backend: Go under `src/server/`.
 - CI and image publishing: `.github/workflows/ci.yml` (GHCR images on `main`).
@@ -19,6 +19,7 @@ Roomies is a roommate-management app for shared expenses, notes, balances, settl
 - `docker compose up --build` (app at http://localhost:8080)
 - `docker compose run --rm test-backend`
 - `docker compose run --rm test-frontend`
+- `docker compose run --build --rm --no-deps test-web` (alternative web lint, tests, build)
 - `docker compose run --rm apk`
 - `docker compose down -v`
 
@@ -30,4 +31,4 @@ Roomies is a roommate-management app for shared expenses, notes, balances, settl
 - For stacked PRs, branch from the parent PR's head and target its branch; keep each PR independently testable.
 - Product flows are verified by agents/cloud as needed; do not reintroduce heavy browser CI gates as the main quality bar.
 - The README states what/how for running and self-hosting; do not add private product or design rationale or extra doc files.
-- Keep the repo lean: Flutter + Go only — no Rust, Nix, helper-script folders, browser e2e suites, or AI scratch docs in git. CI logic lives in the workflow YAML.
+- Keep the repo lean: Flutter + React/TypeScript + Go only — no Rust, Nix, helper-script folders, browser e2e suites, or AI scratch docs in git. CI logic lives in the workflow YAML.

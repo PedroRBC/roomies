@@ -2,7 +2,7 @@
 
 Roomies helps roommates manage shared expenses, notes, balances, and house-scoped household workflows.
 
-- **Apps:** web, Android, Windows, Linux (Flutter)
+- **Apps:** web, Android, Windows, Linux (Flutter); alternative web client (Vite + React, shadcn/ui, Tailwind CSS)
 - **Server:** Go API + worker, PostgreSQL, behind Caddy
 - **Sign-in:** local email/password, or WorkOS AuthKit
 
@@ -143,11 +143,32 @@ Open <http://localhost:8080/> and sign up with any email and password. This star
 | `src/server/` | `docker compose restart backend worker` |
 | `src/app/` | `docker compose up --build -d web` |
 
+### Alternative web client
+
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy, uses HttpOnly cookie sessions, and supports password or WorkOS sign-in, house creation and switching, shared equal-split expenses, balances, settlement suggestions, and notes. Amounts currently display in USD. Other household features and editing/deletion remain available in Flutter.
+
+Select the alternative on the same origin and port as Flutter (only one can use that port):
+
+```sh
+docker compose stop web
+docker compose up --build -d web-vite
+```
+
+Open <http://localhost:8080/> (or your configured `HTTP_PORT`). To switch back:
+
+```sh
+docker compose stop web-vite
+docker compose up --build -d web
+```
+
+The alternative is built locally; the published self-hosting image above continues to serve Flutter. WorkOS uses the same `{ROOMIES_PUBLIC_BASE_URL}/callback` redirect.
+
 Checks and tools:
 
 ```sh
 docker compose run --rm test-backend    # gofmt, vet, tests (SQLite + Postgres)
 docker compose run --rm test-frontend   # flutter analyze + test
+docker compose run --build --rm --no-deps test-web  # Vite lint, unit/component tests, production build
 docker compose run --rm apk             # debug APK -> src/app/build/app/outputs/flutter-apk/
 ```
 
@@ -157,6 +178,7 @@ Windows and Linux builds need their own OS: `flutter build windows|linux --relea
 |---|---|
 | `src/server/` | Go API and worker. `Dockerfile`: `dev` stage (toolchain used by compose) and the production image |
 | `src/app/` | Flutter app. `Dockerfile`: `local` builds the web bundle from source, `prebuilt` (default, what CI publishes) copies `build/web`; both serve it with Caddy and proxy `/api/*` (`SITE_ADDRESS`, `BACKEND_UPSTREAM`) |
+| `src/web/` | Alternative Vite + React web client; shadcn/ui components, Tailwind CSS v4. `web-vite` serves it through Caddy; `test-web` runs its checks |
 | `src/app/lib/` | `app/`: composition, routing and state; `core/`: API, storage and common utilities; `shared/`: widgets, theme and translations; `features/`: product flows. `test/` mirrors these folders |
 | `docker-compose.yml` | Development stack and tooling |
 | `.env.example` | Every config variable, with comments |

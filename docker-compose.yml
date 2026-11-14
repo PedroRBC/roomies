@@ -110,6 +110,26 @@ services:
       - backend
     restart: unless-stopped
 
+  # Alternative web client; explicitly select it instead of web (same port).
+  web-vite:
+    profiles: [vite]
+    build:
+      context: src/web
+      target: local
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - tls:/tls:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  test-web:
+    profiles: [tools]
+    build:
+      context: src/web
+      target: tools
+
   # Tooling: nothing to install on the host.
   test-backend:
     profiles: [tools]

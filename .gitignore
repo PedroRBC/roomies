@@ -46,5 +46,6 @@ Thumbs.db
 coverage.out
 *.html
 !src/app/web/index.html
+!src/web/index.html
 
 .worktrees/
