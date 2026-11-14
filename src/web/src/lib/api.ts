@@ -61,6 +61,8 @@ export interface Expense {
   amount: number;
   date: string;
   payer_name: string;
+  payer_id?: string;
+  visibility?: "shared" | "private";
   category: string;
 }
 export interface Note {

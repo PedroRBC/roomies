@@ -212,6 +212,7 @@ function AppContent() {
         }
         user={user}
         tab={route.tab}
+        navigate={navigate}
         onUnauthorized={onUnauthorized}
         onChanged={refreshHouses}
       />
@@ -249,6 +250,24 @@ function AppContent() {
       navigate={navigate}
       onSelect={setFocus}
       busy={busy}
+      onUnauthorized={onUnauthorized}
+      onChanged={refreshHouses}
+      settings={
+        <>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Security user={user!} onChange={setUser} />
+          <Settings
+            user={user}
+            houses={houses}
+            onRefresh={refreshHouses}
+            onUnauthorized={onUnauthorized}
+          />
+        </>
+      }
       onLogout={() =>
         void run(async () => {
           await api("/auth/logout", { method: "POST" });

@@ -474,7 +474,7 @@ function GroceriesPanel(props: FeatureProps) {
       className="space-y-5"
       aria-label={t("Groceries", "Compras", "Compras")}
     >
-      <h2 className="roomies-page-title">
+      <h2 className="font-heading text-2xl font-semibold">
         {t("Groceries", "Compras", "Compras")}
       </h2>
       <Feedback state={{ ...state, error: selected ? null : state.error }} />
@@ -525,13 +525,11 @@ function GroceriesPanel(props: FeatureProps) {
           )}
         </p>
       )}
-      <ul className="grid gap-5">
+      <ul className="grid">
         {state.items.map((item) => (
           <li key={item.id}>
-            <article className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)">
-              <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
-                {item.name}
-              </h3>
+            <article className="grid grid-cols-[1fr_auto] items-center gap-x-3 border-b py-3">
+              <h3 className="text-base font-semibold">{item.name}</h3>
               <p className="text-[15px] text-muted-foreground">
                 {item.checked
                   ? t("Checked", "Marcado", "Marcado")
@@ -541,7 +539,7 @@ function GroceriesPanel(props: FeatureProps) {
                 item.unit ||
                 item.note ||
                 item.assignee_id) && (
-                <details className="mt-2 text-muted-foreground">
+                <details className="col-span-2 row-start-3 mt-2 text-muted-foreground">
                   <summary className="cursor-pointer py-2 text-sm">
                     {t("Details", "Detalhes", "Detalles")}
                   </summary>
@@ -569,7 +567,7 @@ function GroceriesPanel(props: FeatureProps) {
                 </details>
               )}
               {canWrite && (
-                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1">
                   <Button
                     type="button"
                     variant="outline"
@@ -822,117 +820,129 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
   }
   return (
     <section className="space-y-5" aria-label={title}>
-      <h2 className="roomies-page-title">{title}</h2>
+      <h2 className="font-heading text-2xl font-semibold">{title}</h2>
       <Feedback state={{ ...state, error: selected ? null : state.error }} />
       {!canWrite && <ReadOnly />}
       {canWrite && (
-        <form onSubmit={create}>
-          <fieldset disabled={disabled} className="grid gap-2.5">
-            <Field label={t("Title", "Título", "Título")}>
-              {(id) => <Input id={id} name="title" required maxLength={160} />}
-            </Field>
-            <Field
-              label={
-                isChore
-                  ? t("Due local", "Vencimento local", "Vencimiento local")
-                  : t("Start local", "Início local", "Inicio local")
-              }
-            >
-              {(id) => (
-                <Input
-                  id={id}
-                  type={allDay ? "date" : "datetime-local"}
-                  step={allDay ? undefined : 1}
-                  required
-                  value={start}
-                  onChange={(e) => changeStart(e.target.value)}
-                />
-              )}
-            </Field>
-            {!isChore && (
-              <Field label={t("End local", "Fim local", "Fin local")}>
+        <details
+          open={props.quickCreate || undefined}
+          className="rounded-xl border p-4"
+        >
+          <summary className="cursor-pointer font-semibold text-primary">
+            {isChore
+              ? t("New chore", "Nova tarefa", "Nueva tarea")
+              : t("New event", "Novo evento", "Nuevo evento")}
+          </summary>
+          <form onSubmit={create} className="pt-4">
+            <fieldset disabled={disabled} className="grid gap-2.5">
+              <Field label={t("Title", "Título", "Título")}>
+                {(id) => (
+                  <Input id={id} name="title" required maxLength={160} />
+                )}
+              </Field>
+              <Field
+                label={
+                  isChore
+                    ? t("Due local", "Vencimento local", "Vencimiento local")
+                    : t("Start local", "Início local", "Inicio local")
+                }
+              >
                 {(id) => (
                   <Input
                     id={id}
                     type={allDay ? "date" : "datetime-local"}
                     step={allDay ? undefined : 1}
                     required
-                    value={end}
-                    onChange={(e) => setEnd(e.target.value)}
+                    value={start}
+                    onChange={(e) => changeStart(e.target.value)}
                   />
                 )}
               </Field>
-            )}
-            {!isChore && allDay && (
-              <p className="text-xs text-muted-foreground">
-                {t(
-                  "End is exclusive: a one-day event ends on the following date.",
-                  "O fim é exclusivo: um evento de um dia termina na data seguinte.",
-                  "El final es exclusivo: un evento de un día termina en la fecha siguiente.",
-                )}
-              </p>
-            )}
-            <details>
-              <summary className="cursor-pointer py-2 font-semibold text-primary">
-                {t("More options", "Mais opções", "Más opciones")}
-              </summary>
-              <div className="grid gap-2.5 pt-2">
-                {isChore ? (
-                  <Assignee
-                    members={props.members}
-                    value={assignee}
-                    onChange={setAssignee}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={allDayId}
-                      checked={allDay}
-                      onCheckedChange={(checked) =>
-                        changeAllDay(checked === true)
-                      }
+              {!isChore && (
+                <Field label={t("End local", "Fim local", "Fin local")}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type={allDay ? "date" : "datetime-local"}
+                      step={allDay ? undefined : 1}
+                      required
+                      value={end}
+                      onChange={(e) => setEnd(e.target.value)}
                     />
-                    <Label htmlFor={allDayId}>
-                      {t("All day", "Dia inteiro", "Todo el día")}
-                    </Label>
-                  </div>
-                )}
-                <div>
-                  <Field label={t("Description", "Descrição", "Descripción")}>
-                    {(id) => (
-                      <Textarea
-                        id={id}
-                        name="description"
-                        rows={2}
-                        maxLength={4000}
+                  )}
+                </Field>
+              )}
+              {!isChore && allDay && (
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "End is exclusive: a one-day event ends on the following date.",
+                    "O fim é exclusivo: um evento de um dia termina na data seguinte.",
+                    "El final es exclusivo: un evento de un día termina en la fecha siguiente.",
+                  )}
+                </p>
+              )}
+              <details>
+                <summary className="cursor-pointer py-2 font-semibold text-primary">
+                  {t("More options", "Mais opções", "Más opciones")}
+                </summary>
+                <div className="grid gap-2.5 pt-2">
+                  {isChore ? (
+                    <Assignee
+                      members={props.members}
+                      value={assignee}
+                      onChange={setAssignee}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={allDayId}
+                        checked={allDay}
+                        onCheckedChange={(checked) =>
+                          changeAllDay(checked === true)
+                        }
                       />
-                    )}
-                  </Field>
-                </div>
-                <ScheduleFields />
-                {isChore && (
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={enabledId}
-                      checked={enabled}
-                      onCheckedChange={(checked) =>
-                        setEnabled(checked === true)
-                      }
-                    />
-                    <Label htmlFor={enabledId}>
-                      {t("Enabled", "Ativa", "Activa")}
-                    </Label>
+                      <Label htmlFor={allDayId}>
+                        {t("All day", "Dia inteiro", "Todo el día")}
+                      </Label>
+                    </div>
+                  )}
+                  <div>
+                    <Field label={t("Description", "Descrição", "Descripción")}>
+                      {(id) => (
+                        <Textarea
+                          id={id}
+                          name="description"
+                          rows={2}
+                          maxLength={4000}
+                        />
+                      )}
+                    </Field>
                   </div>
-                )}
-              </div>
-            </details>
-            <Button type="submit" className="my-2 h-12 w-full">
-              {isChore
-                ? t("Create chore", "Criar tarefa", "Crear tarea")
-                : t("Create calendar event", "Criar evento", "Crear evento")}
-            </Button>
-          </fieldset>
-        </form>
+                  <ScheduleFields />
+                  {isChore && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={enabledId}
+                        checked={enabled}
+                        onCheckedChange={(checked) =>
+                          setEnabled(checked === true)
+                        }
+                      />
+                      <Label htmlFor={enabledId}>
+                        {t("Enabled", "Ativa", "Activa")}
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              </details>
+              <Button type="submit" className="my-2 h-12 w-full">
+                {isChore
+                  ? t("Create chore", "Criar tarefa", "Crear tarea")
+                  : t("Create calendar event", "Criar evento", "Crear evento")}
+              </Button>
+            </fieldset>
+          </form>
+        </details>
       )}
       {!state.loading && !state.loadError && state.items.length === 0 && (
         <p className="text-muted-foreground">
@@ -949,13 +959,11 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
               )}
         </p>
       )}
-      <ul className="grid gap-5">
+      <ul className="divide-y">
         {state.items.map((item) => (
           <li key={item.id}>
-            <article className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)">
-              <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
-                {item.title}
-              </h3>
+            <article className="py-4">
+              <h3 className="text-base font-semibold">{item.title}</h3>
               <details className="text-muted-foreground">
                 <summary className="cursor-pointer py-2 text-sm">
                   {t("Details", "Detalhes", "Detalles")}
@@ -1033,7 +1041,7 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
                 </div>
               </details>
               {owned(props, item) && (
-                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1">
                   {"due_local" in item && (
                     <Button
                       type="button"

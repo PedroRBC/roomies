@@ -20,9 +20,16 @@ function HouseBalances({ houseId, onUnauthorized }: FeatureProps) {
       aria-label={t("Balances", "Saldos", "Saldos")}
       className="space-y-5"
     >
-      <h2 className="roomies-page-title">
+      <h2 className="font-heading text-2xl font-semibold">
         {t("Balances", "Saldos", "Saldos")}
       </h2>
+      <p className="text-sm text-muted-foreground">
+        {t(
+          "Suggested transfers from shared expenses. Payments are not recorded.",
+          "Transferências sugeridas pelas despesas compartilhadas. Pagamentos não são registrados.",
+          "Transferencias sugeridas por gastos compartidos. Los pagos no se registran.",
+        )}
+      </p>
       <FinanceError error={error} retry={reload} />
       {loading ? (
         <div role="status" className="flex justify-center py-8">
@@ -49,11 +56,9 @@ function HouseBalances({ houseId, onUnauthorized }: FeatureProps) {
             {data.balances.map((entry) => (
               <article
                 key={entry.user_id}
-                className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)"
+                className="flex flex-wrap items-baseline justify-between gap-3 border-b py-3"
               >
-                <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
-                  {entry.user_name}
-                </h3>
+                <h3 className="font-semibold">{entry.user_name}</h3>
                 <p className="text-muted-foreground">
                   {t(
                     `Paid ${money(entry.paid)}; owed ${money(entry.owed)}; net ${money(entry.net)}`,

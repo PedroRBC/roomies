@@ -4,23 +4,19 @@ import {
   Home,
   LogOut,
   Settings,
-  LayoutDashboard,
-  StickyNote,
-  ShoppingBasket,
+  Sun,
   Wallet,
-  ListChecks,
-  CalendarDays,
-  Scale,
-  Bell,
+  LayoutGrid,
   Users,
-  Menu,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Choice } from "@/components/choice";
+import { HouseWorkspace } from "@/components/house-workspace";
 import { usePreferences } from "@/lib/preferences";
 import type { House, User } from "@/lib/api";
-import type { HouseTab, readRoute } from "@/lib/navigation";
+import type { readRoute } from "@/lib/navigation";
 import { houseLink } from "@/lib/navigation";
 
 export function AppShell({
@@ -33,6 +29,9 @@ export function AppShell({
   onLogout,
   busy,
   children,
+  settings,
+  onUnauthorized,
+  onChanged,
 }: {
   user: User | null;
   houses: House[];
@@ -43,238 +42,222 @@ export function AppShell({
   onLogout: () => void;
   busy: boolean;
   children: ReactNode;
+  settings?: ReactNode;
+  onUnauthorized: () => void;
+  onChanged: () => void;
 }) {
   const { t } = usePreferences();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const sections: { tab: HouseTab; label: string; icon: typeof Home }[] = [
-    { tab: "notes", label: t("Notes", "Notas", "Notas"), icon: StickyNote },
-    {
-      tab: "groceries",
-      label: t("Groceries", "Compras", "Compras"),
-      icon: ShoppingBasket,
-    },
-    {
-      tab: "expenses",
-      label: t("Expenses", "Despesas", "Gastos"),
-      icon: Wallet,
-    },
-    {
-      tab: "chores",
-      label: t("Chores", "Tarefas", "Tareas"),
-      icon: ListChecks,
-    },
-    {
-      tab: "calendar",
-      label: t("Calendar", "Calendário", "Calendario"),
-      icon: CalendarDays,
-    },
-    { tab: "balances", label: t("Balances", "Saldos", "Saldos"), icon: Scale },
-    {
-      tab: "notifications",
-      label: t("Notifications", "Notificações", "Notificaciones"),
-      icon: Bell,
-    },
-    { tab: "members", label: t("Members", "Membros", "Miembros"), icon: Users },
-  ];
-  function go(path: string) {
-    setMenuOpen(false);
-    navigate(path);
-  }
-  function navigation() {
-    return (
-      <div className="flex h-full min-h-0 flex-col px-3 pt-4 pb-3">
-        <Button
-          variant="ghost"
-          className="roomies-wordmark mb-[18px] h-auto justify-start px-3 pt-1 pb-0 text-[26px] hover:bg-transparent"
-          onClick={() => go("/dashboard")}
-        >
-          Roomies
-        </Button>
-        <Button
-          variant="ghost"
-          className="roomies-nav-item"
-          aria-current={route.path === "/dashboard" ? "page" : undefined}
-          onClick={() => go("/dashboard")}
-        >
-          <LayoutDashboard aria-hidden="true" />
-          {t("Home", "Início", "Inicio")}
-        </Button>
-        <p
-          className="px-3 pt-[18px] pb-1.5 text-[11px] font-bold tracking-[0.8px] text-muted-foreground uppercase"
-          aria-hidden="true"
-        >
-          {t("House", "Casa", "Casa")}
-        </p>
-        <nav
-          className="grid content-start gap-0.5 overflow-y-auto"
-          aria-label={t(
-            "House sections",
-            "Seções da casa",
-            "Secciones de la casa",
-          )}
-        >
-          {sections.map(({ tab, label, icon: Icon }) => (
-            <Button
-              key={tab}
-              variant="ghost"
-              className="roomies-nav-item"
-              disabled={!activeHouse}
-              aria-current={
-                route.houseId && route.tab === tab ? "page" : undefined
-              }
-              onClick={() => go(houseLink(activeHouse, tab))}
-            >
-              <Icon aria-hidden="true" />
-              {label}
-            </Button>
-          ))}
-        </nav>
-        <div className="mt-auto pt-3">
-          <div className="mb-2 border-t" />
-          <Button
-            variant="ghost"
-            className="roomies-nav-item"
-            aria-current={route.path === "/settings" ? "page" : undefined}
-            onClick={() => go("/settings")}
-          >
-            <Settings aria-hidden="true" />
-            {t("Settings", "Configurações", "Ajustes")}
-          </Button>
-          <Button
-            variant="ghost"
-            className="roomies-nav-item mt-0.5"
-            disabled={busy}
-            onClick={() => {
-              setMenuOpen(false);
-              onLogout();
-            }}
-          >
-            <LogOut aria-hidden="true" />
-            {t("Sign out", "Sair", "Cerrar sesión")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const [panel, setPanel] = useState<
+    "members" | "notifications" | "settings" | null
+  >(null);
+  const house = houses.find((h) => h.id === activeHouse);
+  const space = route.houseId
+    ? ["expenses", "balances"].includes(route.tab)
+      ? "money"
+      : "household"
+    : "today";
   const authPage = !user && route.path !== "/settings";
+  const destinations = [
+    {
+      id: "today",
+      label: t("Today", "Hoje", "Hoy"),
+      icon: Sun,
+      path: "/dashboard",
+    },
+    {
+      id: "money",
+      label: t("Money", "Dinheiro", "Dinero"),
+      icon: Wallet,
+      path: houseLink(activeHouse, "expenses"),
+    },
+    {
+      id: "household",
+      label: t("Household", "Casa", "Casa"),
+      icon: LayoutGrid,
+      path: houseLink(activeHouse, "groceries"),
+    },
+  ];
   return (
-    <div
-      className={`min-h-svh bg-background text-foreground ${user ? "min-[900px]:pl-[248px]" : ""}`}
-    >
+    <div className="min-h-svh bg-background text-foreground">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:z-[60] focus:bg-card focus:p-4"
       >
         {t("Skip to content", "Pular para o conteúdo", "Saltar al contenido")}
       </a>
-      {user && (
-        <>
-          <aside
-            className="fixed inset-y-0 left-0 hidden w-[248px] border-r bg-card min-[900px]:block"
-            aria-label={t("Navigation", "Navegação", "Navegación")}
-          >
-            {navigation()}
-          </aside>
-          <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-            <DialogContent
-              className="inset-y-0 left-0 h-svh w-[min(320px,calc(100vw-48px))] max-w-none translate-x-0 translate-y-0 rounded-none border-r bg-card p-0 min-[900px]:hidden"
-              aria-describedby={undefined}
-            >
-              <DialogTitle className="sr-only">
-                {t("Navigation", "Navegação", "Navegación")}
-              </DialogTitle>
-              {navigation()}
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-      <header className="relative flex h-14 items-center justify-center px-3">
-        {user ? (
-          <>
+      <header className="border-b bg-card">
+        <div className="mx-auto flex min-h-18 max-w-[1320px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
             <Button
               variant="ghost"
-              size="icon"
-              className="absolute left-2 min-[900px]:hidden"
-              aria-label={t("Open menu", "Abrir menu", "Abrir menú")}
-              onClick={() => setMenuOpen(true)}
+              className="roomies-wordmark hidden px-0 text-2xl sm:inline-flex"
+              onClick={() => navigate("/dashboard")}
             >
-              <Menu aria-hidden="true" />
+              Roomies
             </Button>
-            <div className="max-w-[calc(100%-104px)]">
-              {houses.length ? (
-                <Choice
-                  hideLabel
-                  label={t("Your house", "Sua casa", "Tu casa")}
-                  value={
-                    houses.some((h) => h.id === activeHouse)
-                      ? activeHouse
-                      : houses[0].id
-                  }
-                  choices={[
-                    ...houses.map((h) => ({ value: h.id, label: h.name })),
-                    {
-                      value: "__create__",
-                      label: t("Create house", "Criar casa", "Crear casa"),
-                    },
-                  ]}
-                  onChange={(id) => {
-                    if (id === "__create__") go("/dashboard?create=1");
-                    else {
-                      onSelect(id);
-                      if (route.houseId) go(houseLink(id, route.tab));
-                    }
-                  }}
-                />
-              ) : (
+            {user ? (
+              <div className="w-full min-w-0 max-w-64">
+                {houses.length ? (
+                  <Choice
+                    hideLabel
+                    label={t("Your house", "Sua casa", "Tu casa")}
+                    value={activeHouse || houses[0].id}
+                    choices={[
+                      ...houses.map((h) => ({ value: h.id, label: h.name })),
+                      {
+                        value: "__create__",
+                        label: t("Create house", "Criar casa", "Crear casa"),
+                      },
+                    ]}
+                    onChange={(id) => {
+                      setPanel(null);
+                      if (id === "__create__") navigate("/dashboard?create=1");
+                      else {
+                        onSelect(id);
+                        if (route.houseId) navigate(houseLink(id, route.tab));
+                      }
+                    }}
+                  />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate("/dashboard?create=1")}
+                  >
+                    <Home />
+                    {t("Create house", "Criar casa", "Crear casa")}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <span className="roomies-wordmark text-2xl">Roomies</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-0 sm:gap-1 [&>button]:size-10 sm:[&>button]:size-12">
+            {user && (
+              <>
                 <Button
                   variant="ghost"
-                  onClick={() => go("/dashboard?create=1")}
+                  size="icon"
+                  disabled={!house}
+                  aria-label={t(
+                    "House members",
+                    "Membros da casa",
+                    "Miembros de la casa",
+                  )}
+                  onClick={() => setPanel("members")}
                 >
-                  <Home aria-hidden="true" />
-                  {t("Create house", "Criar casa", "Crear casa")}
+                  <Users />
                 </Button>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            {route.path === "/settings" && (
-              <Button
-                variant="ghost"
-                className="absolute left-2"
-                onClick={() => go("/")}
-              >
-                {t("Back", "Voltar", "Volver")}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!house}
+                  aria-label={t(
+                    "Notifications",
+                    "Notificações",
+                    "Notificaciones",
+                  )}
+                  onClick={() => setPanel("notifications")}
+                >
+                  <Bell />
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2"
-              onClick={() => go("/settings")}
               aria-label={t("Settings", "Configurações", "Ajustes")}
-              title={t("Settings", "Configurações", "Ajustes")}
+              onClick={() =>
+                user
+                  ? setPanel("settings")
+                  : navigate(route.path === "/settings" ? "/" : "/settings")
+              }
             >
-              <Settings
-                className="size-6! text-muted-foreground"
-                aria-hidden="true"
-              />
+              <Settings />
             </Button>
-          </>
+          </div>
+        </div>
+        {user && (
+          <nav
+            className="mx-auto flex max-w-[1320px] gap-1 px-4 sm:px-8"
+            aria-label={t(
+              "Workspaces",
+              "Espaços de trabalho",
+              "Espacios de trabajo",
+            )}
+          >
+            {destinations.map(({ id, label, icon: Icon, path }) => (
+              <button
+                key={id}
+                type="button"
+                disabled={id !== "today" && !activeHouse}
+                aria-current={space === id ? "page" : undefined}
+                onClick={() => navigate(path)}
+                className="flex min-h-12 flex-1 items-center justify-center gap-2 border-b-2 border-transparent px-4 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40 aria-[current=page]:border-primary aria-[current=page]:text-foreground sm:flex-none"
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
         )}
       </header>
       <main
         id="main"
         className={
           authPage
-            ? "flex min-h-[calc(100svh-112px)] flex-col"
-            : route.houseId
-              ? "mx-auto w-full max-w-[860px] px-5 pt-2 pb-8"
-              : "mx-auto w-full max-w-[1200px] px-5 py-4"
+            ? "flex min-h-[calc(100svh-144px)] flex-col"
+            : "mx-auto w-full max-w-[1320px] px-4 py-7 sm:px-8 sm:py-10"
         }
       >
         {children}
       </main>
+      {user && (
+        <Dialog
+          open={panel !== null}
+          onOpenChange={(open) => {
+            if (!open) setPanel(null);
+          }}
+        >
+          <DialogContent
+            aria-describedby={undefined}
+            className="inset-y-0 right-0 left-auto h-svh w-full max-w-[640px] translate-x-0 translate-y-0 overflow-y-auto rounded-none p-6 sm:max-w-[640px]"
+          >
+            <DialogTitle>
+              {panel === "members"
+                ? t("House members", "Membros da casa", "Miembros de la casa")
+                : panel === "notifications"
+                  ? t(
+                      "Notifications & reminders",
+                      "Notificações e lembretes",
+                      "Notificaciones y recordatorios",
+                    )
+                  : t("Your settings", "Suas configurações", "Tus ajustes")}
+            </DialogTitle>
+            {panel === "settings" ? (
+              <>
+                {settings}
+                <Button variant="outline" disabled={busy} onClick={onLogout}>
+                  <LogOut />
+                  {t("Sign out", "Sair", "Cerrar sesión")}
+                </Button>
+              </>
+            ) : (
+              house &&
+              panel && (
+                <HouseWorkspace
+                  key={`${house.id}:${panel}`}
+                  house={house}
+                  user={user}
+                  tab={panel}
+                  onUnauthorized={onUnauthorized}
+                  onChanged={onChanged}
+                />
+              )
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
       {authPage && (
         <footer className="flex h-14 items-center justify-center text-xs text-muted-foreground">
           {route.path !== "/register" &&

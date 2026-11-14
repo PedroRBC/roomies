@@ -40,8 +40,8 @@ export function Choice({
           id={id}
           className={
             hideLabel
-              ? "h-10! w-full gap-2 bg-card px-3 font-semibold"
-              : "w-full"
+              ? "h-10! w-full min-w-0 gap-2 bg-card px-3 font-semibold"
+              : "w-full min-w-0"
           }
         >
           {hideLabel && (
@@ -50,7 +50,7 @@ export function Choice({
               aria-hidden="true"
             />
           )}
-          <SelectValue>
+          <SelectValue className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
             {choices.find((item) => item.value === value)?.label}
           </SelectValue>
         </SelectTrigger>

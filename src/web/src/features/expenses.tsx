@@ -38,7 +38,7 @@ function ExpensesHouse(props: FeatureProps) {
     path,
     props.onUnauthorized,
   );
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(props.quickCreate ?? false);
   const [creatingBusy, setCreatingBusy] = useState(false);
   const [selected, setSelected] = useState<FinanceExpense | null>(null);
   const [deleting, setDeleting] = useState<FinanceExpense | null>(null);
@@ -51,14 +51,14 @@ function ExpensesHouse(props: FeatureProps) {
   return (
     <section
       aria-label={t("Expenses", "Despesas", "Gastos")}
-      className="grid gap-5"
+      className="grid gap-2"
     >
-      <h2 className="roomies-page-title">
+      <h2 className="font-heading text-2xl font-semibold">
         {t("Expenses", "Despesas", "Gastos")}
       </h2>
       {canCreate(props.role) && (
         <Button
-          className="my-2 h-12 w-full"
+          className="justify-self-start"
           disabled={creatingBusy}
           onClick={() => setCreating((value) => !value)}
         >
@@ -110,47 +110,48 @@ function ExpensesHouse(props: FeatureProps) {
         </p>
       ) : (
         resource.data?.map((expense) => (
-          <article key={expense.id}>
-            <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
-              <CardHeader className="px-5">
-                <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
-                  <h3>{expense.description}</h3>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-5">
-                <p className="text-[15px] text-muted-foreground">
-                  {financeDate(expense.date, locale)} · {money(expense.amount)}{" "}
-                  · {expense.payer_name} ·{" "}
-                  {expense.visibility === "private"
-                    ? t("Private", "Privada", "Privado")
-                    : t("Shared", "Compartilhada", "Compartido")}
-                </p>
-                <div className="flex flex-wrap justify-end gap-2 pt-2">
-                  <Button
-                    className="h-10 px-4"
-                    variant="outline"
-                    onClick={() => setSelected(expense)}
-                  >
-                    {permitted(expense)
-                      ? t(
-                          "Details / edit",
-                          "Detalhes / editar",
-                          "Detalles / editar",
-                        )
-                      : t("Details", "Detalhes", "Detalles")}
-                  </Button>
-                  {permitted(expense) && (
-                    <Button
-                      variant="ghost"
-                      className="h-10 px-4 text-destructive hover:text-destructive"
-                      onClick={() => setDeleting(expense)}
-                    >
-                      {t("Delete", "Excluir", "Eliminar")}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <article
+            key={expense.id}
+            className="flex flex-wrap items-center justify-between gap-3 border-b py-4"
+          >
+            <div className="min-w-0 flex-1 basis-48">
+              <h3 className="font-semibold break-words">
+                {expense.description}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {financeDate(expense.date, locale)} · {expense.payer_name} ·{" "}
+                {expense.visibility === "private"
+                  ? t("Private", "Privada", "Privado")
+                  : t("Shared", "Compartilhada", "Compartido")}
+              </p>
+            </div>
+            <p className="font-semibold tabular-nums">
+              {money(expense.amount)}
+            </p>
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              <Button
+                className="h-10 px-4"
+                variant="outline"
+                onClick={() => setSelected(expense)}
+              >
+                {permitted(expense)
+                  ? t(
+                      "Details / edit",
+                      "Detalhes / editar",
+                      "Detalles / editar",
+                    )
+                  : t("Details", "Detalhes", "Detalles")}
+              </Button>
+              {permitted(expense) && (
+                <Button
+                  variant="ghost"
+                  className="h-10 px-4 text-destructive hover:text-destructive"
+                  onClick={() => setDeleting(expense)}
+                >
+                  {t("Delete", "Excluir", "Eliminar")}
+                </Button>
+              )}
+            </div>
           </article>
         ))
       )}
@@ -212,7 +213,7 @@ function ExpenseDialog(
       <DialogContent
         showCloseButton={false}
         aria-describedby={undefined}
-        className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
+        className="inset-y-0 right-0 left-auto h-svh w-full translate-x-0 translate-y-0 overflow-y-auto rounded-none sm:max-w-xl"
       >
         <DialogTitle className="font-heading text-[22px] font-semibold leading-tight">
           {t("Expense details", "Detalhes da despesa", "Detalles del gasto")}

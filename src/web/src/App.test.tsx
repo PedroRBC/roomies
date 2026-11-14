@@ -83,6 +83,7 @@ it.each([
     });
     const actor = userEvent.setup();
     render(<App />);
+    await actor.click(await screen.findByRole("button", { name: "Settings" }));
     await actor.click(await screen.findByRole("button", { name: "Sign out" }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(failure.message),
@@ -114,7 +115,7 @@ it("opens create-house from the shared switcher", async () => {
   expect(window.location.search).toBe("?create=1");
 });
 
-it("closes the mobile drawer when a house section is selected", async () => {
+it("groups household destinations and manages members without leaving the current location", async () => {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/auth/config") return { password: true, google: false };
     if (path === "/auth/me") return user;
@@ -126,13 +127,14 @@ it("closes the mobile drawer when a house section is selected", async () => {
   });
   const actor = userEvent.setup();
   render(<App />);
-  await actor.click(await screen.findByRole("button", { name: "Open menu" }));
-  const drawer = await screen.findByRole("dialog", { name: "Navigation" });
-  await actor.click(within(drawer).getByRole("button", { name: "Notes" }));
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-  );
+  await actor.click(await screen.findByRole("button", { name: "Household" }));
+  await actor.click(await screen.findByRole("button", { name: "Noticeboard" }));
   expect(window.location.pathname).toBe("/house/one");
+  expect(window.location.search).toBe("?tab=notes");
+  await actor.click(screen.getByRole("button", { name: "House members" }));
+  expect(
+    await screen.findByRole("dialog", { name: "House members" }),
+  ).toBeInTheDocument();
   expect(window.location.search).toBe("?tab=notes");
 });
 
