@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   Area,
@@ -13,7 +14,16 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePreferences } from "@/lib/preferences";
 import type { ChartRow } from "./dashboard-model";
@@ -195,6 +205,178 @@ export function DashboardChart({
               </div>
             </details>
           </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function SpendingAreaChart({
+  expenses,
+}: {
+  expenses: import("@/lib/api").Expense[];
+}) {
+  const { t, locale, money } = usePreferences();
+  const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
+  const [end] = useState(() => {
+    const value = new Date();
+    value.setHours(0, 0, 0, 0);
+    return value;
+  });
+  const start = new Date(end);
+  start.setDate(start.getDate() - days + 1);
+  const centsByDate = new Map<string, number>();
+  for (const expense of expenses) {
+    if (expense.visibility === "private") continue;
+    const key = expense.date.slice(0, 10);
+    centsByDate.set(
+      key,
+      (centsByDate.get(key) ?? 0) + Math.round(expense.amount * 100),
+    );
+  }
+  const data = Array.from({ length: days }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const key = date.toISOString().slice(0, 10);
+    return { date: key, spending: centsByDate.get(key) ?? 0 };
+  });
+  const hasSpending = data.some((item) => item.spending > 0);
+  const config = {
+    spending: {
+      label: t(
+        "Shared spending",
+        "Gastos compartilhados",
+        "Gastos compartidos",
+      ),
+      color: "var(--chart-1)",
+    },
+  } satisfies import("@/components/ui/chart").ChartConfig;
+  return (
+    <Card className="gap-0 overflow-hidden pt-0">
+      <CardHeader className="flex flex-wrap items-start gap-3 border-b py-5 sm:flex-row sm:items-center">
+        <div className="grid flex-1 gap-1">
+          <CardTitle className="font-sans text-base font-semibold">
+            {t(
+              "Spending over time",
+              "Gastos ao longo do tempo",
+              "Gastos a lo largo del tiempo",
+            )}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "Shared expenses recorded each day",
+              "Despesas compartilhadas registradas por dia",
+              "Gastos compartidos registrados por día",
+            )}
+          </p>
+        </div>
+        <Select
+          value={range}
+          onValueChange={(value) => value && setRange(value as typeof range)}
+        >
+          <SelectTrigger
+            className="w-[150px]"
+            aria-label={t(
+              "Spending range",
+              "Período dos gastos",
+              "Período de gastos",
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">
+              {t("Last 7 days", "Últimos 7 dias", "Últimos 7 días")}
+            </SelectItem>
+            <SelectItem value="30d">
+              {t("Last 30 days", "Últimos 30 dias", "Últimos 30 días")}
+            </SelectItem>
+            <SelectItem value="90d">
+              {t("Last 90 days", "Últimos 90 dias", "Últimos 90 días")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </CardHeader>
+      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+        {!hasSpending ? (
+          <p className="py-12 text-sm text-muted-foreground">
+            {t(
+              "No shared spending in this range.",
+              "Nenhum gasto compartilhado neste período.",
+              "No hay gastos compartidos en este período.",
+            )}
+          </p>
+        ) : (
+          <ChartContainer
+            config={config}
+            className="h-[280px] w-full aspect-auto"
+            role="img"
+            aria-label={t(
+              "Shared spending over time",
+              "Gastos compartilhados ao longo do tempo",
+              "Gastos compartidos a lo largo del tiempo",
+            )}
+          >
+            <AreaChart
+              accessibilityLayer
+              data={data}
+              margin={{ left: 8, right: 12 }}
+            >
+              <defs>
+                <linearGradient id="fillSpending" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-spending)"
+                    stopOpacity={0.75}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-spending)"
+                    stopOpacity={0.08}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                minTickGap={28}
+                tickFormatter={(value) =>
+                  new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
+                    month: "short",
+                    day: "numeric",
+                  })
+                }
+              />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(value) =>
+                      new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
+                        month: "short",
+                        day: "numeric",
+                      })
+                    }
+                    formatter={(value) => money(Number(value) / 100)}
+                    indicator="dot"
+                  />
+                }
+              />
+              <Area
+                type="natural"
+                dataKey="spending"
+                stroke="var(--color-spending)"
+                fill="url(#fillSpending)"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <ChartLegend content={<ChartLegendContent />} />
+            </AreaChart>
+          </ChartContainer>
         )}
       </CardContent>
     </Card>

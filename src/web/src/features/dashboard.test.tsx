@@ -407,21 +407,85 @@ it("preserves an open reminder draft across failed background refreshes", async 
   );
 });
 
-it("opens a ready expense composer without leaving Today and focuses inline shopping",async()=>{
- vi.mocked(api).mockImplementation(async path=>path.endsWith("/members")?[{user_id:"me",user_name:"Alex",role:"admin"}]:path==="/houses/one"?{id:"one",name:"First home"}:[]);
- render(<PreferencesProvider><Dashboard {...props} selected="one"/></PreferencesProvider>);
- const shopping=await screen.findByRole("textbox",{name:"Name"});
- fireEvent.click(screen.getByRole("button",{name:"Add shopping item"}));
- expect(shopping).toBeInTheDocument();
- fireEvent.click(screen.getByRole("button",{name:"Add expense"}));
- const drawer=await screen.findByRole("dialog",{name:"Quick workspace"});
- expect(await within(drawer).findByRole("textbox",{name:"Amount"})).toBeVisible();
- expect(props.navigate).not.toHaveBeenCalled();
+it("opens a ready expense composer without leaving Today and focuses inline shopping", async () => {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path.endsWith("/members")
+      ? [{ user_id: "me", user_name: "Alex", role: "admin" }]
+      : path === "/houses/one"
+        ? { id: "one", name: "First home" }
+        : [],
+  );
+  render(
+    <PreferencesProvider>
+      <Dashboard {...props} selected="one" />
+    </PreferencesProvider>,
+  );
+  const shopping = await screen.findByRole("textbox", { name: "Name" });
+  fireEvent.click(screen.getByRole("button", { name: "Add shopping item" }));
+  expect(shopping).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Add expense" }));
+  const drawer = await screen.findByRole("dialog", { name: "Quick workspace" });
+  expect(
+    await within(drawer).findByRole("textbox", { name: "Amount" }),
+  ).toBeVisible();
+  expect(props.navigate).not.toHaveBeenCalled();
 });
-it("keeps creation actions unavailable for a read-only house member",async()=>{
- vi.mocked(api).mockImplementation(async path=>path.endsWith("/members")?[{user_id:"me",user_name:"Alex",role:"monitor"}]:[]);
- render(<PreferencesProvider><Dashboard {...props} selected="one"/></PreferencesProvider>);
- await screen.findByText("No notes yet.");
- expect(screen.getByRole("button",{name:"Add expense"})).toBeDisabled();
- expect(screen.getByRole("button",{name:"Write a note"})).toBeDisabled();
+it("keeps creation actions unavailable for a read-only house member", async () => {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path.endsWith("/members")
+      ? [{ user_id: "me", user_name: "Alex", role: "monitor" }]
+      : [],
+  );
+  render(
+    <PreferencesProvider>
+      <Dashboard {...props} selected="one" />
+    </PreferencesProvider>,
+  );
+  await screen.findByText("No notes yet.");
+  expect(screen.getByRole("button", { name: "Add expense" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Write a note" })).toBeDisabled();
+});
+
+it("shows an interactive spending area chart in Money", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  vi.mocked(api).mockImplementation(async (path) =>
+    path.endsWith("/expenses")
+      ? [
+          {
+            id: "recent",
+            description: "Groceries",
+            amount: 32.5,
+            date: today,
+            visibility: "shared",
+          },
+          {
+            id: "private",
+            description: "Private",
+            amount: 90,
+            date: tomorrow,
+            visibility: "private",
+          },
+        ]
+      : [],
+  );
+  render(
+    <PreferencesProvider>
+      <MoneyInsights
+        houseId="one"
+        user={props.user}
+        role="admin"
+        members={[]}
+        onUnauthorized={props.onUnauthorized}
+        navigate={props.navigate}
+      />
+    </PreferencesProvider>,
+  );
+  expect(await screen.findByText("Spending over time")).toBeInTheDocument();
+  expect(
+    screen.getByRole("combobox", { name: "Spending range" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Shared spending over time" }),
+  ).toBeInTheDocument();
 });

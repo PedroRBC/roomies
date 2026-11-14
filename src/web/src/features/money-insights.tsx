@@ -4,6 +4,7 @@ import type { Expense } from "@/lib/api";
 import { useFinanceResource } from "./finance-resource";
 import { FinanceError } from "./finance-ui";
 import DashboardInsights from "./dashboard-insights";
+import { SpendingAreaChart } from "./dashboard-charts";
 export function MoneyInsights(
   props: FeatureProps & { navigate: (path: string) => void },
 ) {
@@ -21,12 +22,15 @@ export function MoneyInsights(
         </p>
       ) : (
         resource.data && (
-          <DashboardInsights
-            expenses={resource.data}
-            userId={props.user.id}
-            houseId={props.houseId}
-            navigate={props.navigate}
-          />
+          <>
+            <SpendingAreaChart expenses={resource.data} />
+            <DashboardInsights
+              expenses={resource.data}
+              userId={props.user.id}
+              houseId={props.houseId}
+              navigate={props.navigate}
+            />
+          </>
         )
       )}
     </>
