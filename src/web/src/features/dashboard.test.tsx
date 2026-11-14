@@ -51,7 +51,7 @@ it("shows exact monthly expense totals and upcoming enabled entries", async () =
     </PreferencesProvider>,
   );
   expect(await screen.findByText("Movie night")).toBeInTheDocument();
-  expect(screen.getAllByText("$0.30").length).toBeGreaterThan(0);
+  expect(screen.getByText("Total: $0.30")).toBeInTheDocument();
   expect(screen.queryByText("Disabled chore")).not.toBeInTheDocument();
 });
 it.each([
@@ -176,4 +176,29 @@ it("does not show a late private summary after changing the focused house", asyn
   await waitFor(() =>
     expect(screen.queryByText("Private old note")).not.toBeInTheDocument(),
   );
+});
+
+it("selects a note with the carousel indicators and opens the house notes", async () => {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path.endsWith("/notes")
+      ? [
+          { id: "first", title: "First note", content: "First content" },
+          { id: "second", title: "Second note", content: "Second content" },
+        ]
+      : [],
+  );
+  render(
+    <PreferencesProvider>
+      <Dashboard {...props} selected="one" />
+    </PreferencesProvider>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Open note 2: Second note" }),
+  );
+  expect(
+    screen.getByRole("heading", { name: "Second note" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("First content")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Open notes" }));
+  expect(props.navigate).toHaveBeenCalledWith("/house/one?tab=notes");
 });

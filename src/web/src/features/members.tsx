@@ -13,7 +13,6 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Choice } from "@/components/choice";
 import { Field } from "@/components/field";
 import { ConfirmAction } from "@/components/confirm-action";
@@ -122,8 +121,8 @@ export function Members({
     }
   }
   return (
-    <section className="grid gap-6">
-      <h2 className="text-2xl font-semibold">
+    <section className="grid gap-5">
+      <h2 className="roomies-page-title mb-2">
         {t("Members", "Membros", "Miembros")}
       </h2>
       {error && (
@@ -151,19 +150,12 @@ export function Members({
       {admin && (
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="font-sans text-[19px] font-bold">
               {t("Invite by email", "Convidar por email", "Invitar por correo")}
             </CardTitle>
-            <CardDescription>
-              {t(
-                "Invite a roommate with their account email.",
-                "Convide alguém usando o email da conta.",
-                "Invita a alguien con el correo de su cuenta.",
-              )}
-            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5">
-            <form onSubmit={send} className="grid gap-4 sm:grid-cols-2">
+            <form onSubmit={send} className="grid gap-4">
               <Field label="Email" name="email" type="email" required />
               <Choice
                 label={t("Role", "Função", "Rol")}
@@ -171,7 +163,7 @@ export function Members({
                 choices={roles}
                 onChange={setInviteRole}
               />
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" disabled={busy} className="mt-2 w-full">
                 {t("Send invitation", "Enviar convite", "Enviar invitación")}
               </Button>
             </form>
@@ -216,7 +208,7 @@ export function Members({
                 </Button>
               </div>
             )}
-            <h3 className="font-semibold">
+            <h3 className="text-[19px] font-bold">
               {t(
                 "Invitation history",
                 "Histórico de convites",
@@ -232,7 +224,7 @@ export function Members({
                 )}
               </p>
             ) : invites.length === 0 ? (
-              <p className="text-muted-foreground">
+              <p className="text-base">
                 {t(
                   "No invitations yet.",
                   "Nenhum convite ainda.",
@@ -240,7 +232,7 @@ export function Members({
                 )}
               </p>
             ) : (
-              <ul className="divide-y">
+              <ul>
                 {invites.map((invite) => (
                   <li
                     key={invite.id}
@@ -293,19 +285,19 @@ export function Members({
           <li key={member.user_id}>
             <Card>
               <CardHeader>
-                <CardTitle>
+                <CardTitle className="font-sans text-[19px] font-bold">
                   {member.user_name}
                   {member.user_id === user.id
                     ? ` (${t("you", "você", "tú")})`
                     : ""}
                 </CardTitle>
-                <CardDescription>{member.user_email}</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                <Badge variant="secondary">
+                <CardDescription className="text-base text-foreground">
+                  {member.user_email} ·{" "}
                   {roles.find((item) => item.value === member.role)?.label ??
                     member.role}
-                </Badge>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
                 {admin && (
                   <div className="flex flex-wrap items-end gap-3">
                     <Choice
@@ -321,7 +313,8 @@ export function Members({
                       }
                     />
                     <Button
-                      variant="outline"
+                      variant="ghost"
+                      className="text-primary"
                       disabled={
                         busy ||
                         (pending[member.user_id] ?? member.role) === member.role

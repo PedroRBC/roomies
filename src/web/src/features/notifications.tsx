@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Globe, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -59,7 +60,7 @@ function Check({
 }) {
   const id = useId();
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex min-h-14 items-center gap-3 [&_label]:text-base [&_label]:font-normal">
       <Checkbox
         id={id}
         disabled={disabled}
@@ -113,7 +114,7 @@ function Choice({
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card className="gap-4 p-5">
-      <h3 className="font-heading text-xl font-semibold">{title}</h3>
+      <h3 className="text-[19px] font-bold tracking-[-0.1px]">{title}</h3>
       {children}
     </Card>
   );
@@ -629,7 +630,7 @@ function NotificationSettings({
         "Notificaciones y agenda",
       )}
     >
-      <h2 className="font-heading text-2xl font-semibold">
+      <h2 className="roomies-page-title">
         {t(
           "Notifications and schedule",
           "Notificações e agenda",
@@ -655,7 +656,7 @@ function NotificationSettings({
             savePreferences();
           }}
         >
-          <fieldset disabled={busy} className="grid gap-5">
+          <fieldset disabled={busy} className="grid gap-6">
             <legend className="sr-only">
               {t(
                 "Alert settings",
@@ -663,91 +664,117 @@ function NotificationSettings({
                 "Ajustes de alertas",
               )}
             </legend>
-            <Check
-              disabled={busy}
-              label={t(
-                "Shared expense alerts",
-                "Alertas de despesas compartilhadas",
-                "Alertas de gastos compartidos",
-              )}
-              checked={prefs.expense_created_enabled}
-              onChange={(value) => updatePref("expense_created_enabled", value)}
-            />
-            <Check
-              disabled={busy}
-              label={t(
-                "Scheduled reminder alerts",
-                "Alertas de lembretes agendados",
-                "Alertas de recordatorios programados",
-              )}
-              checked={prefs.reminder_enabled}
-              onChange={(value) => updatePref("reminder_enabled", value)}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Choice
+            <div>
+              <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                {t("Alerts", "Alertas", "Alertas")}
+              </h4>
+              <Check
                 disabled={busy}
-                label={t("Delivery", "Entrega", "Entrega")}
-                value={prefs.cadence}
-                onChange={(value) => updatePref("cadence", value)}
-                options={[
-                  ["immediate", t("Immediate", "Imediata", "Inmediata")],
-                  [
-                    "daily_digest",
-                    t("Daily digest", "Resumo diário", "Resumen diario"),
-                  ],
-                ]}
-              />
-              <Field
                 label={t(
-                  "Preference timezone",
-                  "Fuso horário das preferências",
-                  "Zona horaria de preferencias",
+                  "Shared expense alerts",
+                  "Alertas de despesas compartilhadas",
+                  "Alertas de gastos compartidos",
                 )}
-                value={prefs.timezone}
-                onChange={(e) => updatePref("timezone", e.target.value)}
-                required
-                placeholder="Europe/Lisbon"
-              />
-              <Field
-                type="time"
-                label={t(
-                  "Quiet start (local)",
-                  "Início do silêncio (local)",
-                  "Inicio del silencio (local)",
-                )}
-                value={minutesTime(prefs.quiet_start_minutes)}
-                onChange={(e) =>
-                  updatePref("quiet_start_minutes", timeMinutes(e.target.value))
+                checked={prefs.expense_created_enabled}
+                onChange={(value) =>
+                  updatePref("expense_created_enabled", value)
                 }
               />
-              <Field
-                type="time"
+              <Check
+                disabled={busy}
                 label={t(
-                  "Quiet end (local)",
-                  "Fim do silêncio (local)",
-                  "Fin del silencio (local)",
+                  "Scheduled reminder alerts",
+                  "Alertas de lembretes agendados",
+                  "Alertas de recordatorios programados",
                 )}
-                value={minutesTime(prefs.quiet_end_minutes)}
-                onChange={(e) =>
-                  updatePref("quiet_end_minutes", timeMinutes(e.target.value))
-                }
+                checked={prefs.reminder_enabled}
+                onChange={(value) => updatePref("reminder_enabled", value)}
               />
-              <Field
-                type="time"
-                label={t(
-                  "Daily digest time (local)",
-                  "Horário do resumo diário (local)",
-                  "Hora del resumen diario (local)",
+            </div>
+            <div>
+              <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                {t("Timing", "Horário", "Horario")}
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Choice
+                  disabled={busy}
+                  label={t("Delivery", "Entrega", "Entrega")}
+                  value={prefs.cadence}
+                  onChange={(value) => updatePref("cadence", value)}
+                  options={[
+                    ["immediate", t("Immediate", "Imediata", "Inmediata")],
+                    [
+                      "daily_digest",
+                      t("Daily digest", "Resumo diário", "Resumen diario"),
+                    ],
+                  ]}
+                />
+                <Field
+                  label={t(
+                    "Preference timezone",
+                    "Fuso horário das preferências",
+                    "Zona horaria de preferencias",
+                  )}
+                  value={prefs.timezone}
+                  onChange={(e) => updatePref("timezone", e.target.value)}
+                  required
+                  placeholder="Europe/Lisbon"
+                />
+              </div>
+            </div>
+            <div>
+              <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                {t(
+                  "Quiet hours and digest",
+                  "Silêncio e resumo",
+                  "Silencio y resumen",
                 )}
-                required
-                value={minutesTime(prefs.digest_minutes)}
-                onChange={(e) =>
-                  updatePref(
-                    "digest_minutes",
-                    timeMinutes(e.target.value) ?? -1,
-                  )
-                }
-              />
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  type="time"
+                  label={t(
+                    "Quiet start (local)",
+                    "Início do silêncio (local)",
+                    "Inicio del silencio (local)",
+                  )}
+                  value={minutesTime(prefs.quiet_start_minutes)}
+                  onChange={(e) =>
+                    updatePref(
+                      "quiet_start_minutes",
+                      timeMinutes(e.target.value),
+                    )
+                  }
+                />
+                <Field
+                  type="time"
+                  label={t(
+                    "Quiet end (local)",
+                    "Fim do silêncio (local)",
+                    "Fin del silencio (local)",
+                  )}
+                  value={minutesTime(prefs.quiet_end_minutes)}
+                  onChange={(e) =>
+                    updatePref("quiet_end_minutes", timeMinutes(e.target.value))
+                  }
+                />
+                <Field
+                  type="time"
+                  label={t(
+                    "Daily digest time (local)",
+                    "Horário do resumo diário (local)",
+                    "Hora del resumen diario (local)",
+                  )}
+                  required
+                  value={minutesTime(prefs.digest_minutes)}
+                  onChange={(e) =>
+                    updatePref(
+                      "digest_minutes",
+                      timeMinutes(e.target.value) ?? -1,
+                    )
+                  }
+                />
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {t(
@@ -837,7 +864,7 @@ function NotificationSettings({
           </div>
         </fieldset>
         {pushStatus && <p role="status">{pushStatus}</p>}
-        <h4 className="font-semibold">
+        <h4 className="mt-2 border-t pt-6 text-base">
           {t("Your devices", "Seus dispositivos", "Tus dispositivos")}
         </h4>
         {subscriptions.length === 0 && (
@@ -849,32 +876,45 @@ function NotificationSettings({
             )}
           </p>
         )}
-        <ul className="divide-y">
+        <ul>
           {subscriptions.map((device) => (
             <li
               key={device.id}
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
-              <div>
-                <p className="font-medium">
-                  {device.device_label ||
-                    t(
-                      "Unnamed device",
-                      "Dispositivo sem nome",
-                      "Dispositivo sin nombre",
-                    )}{" "}
-                  ·{" "}
-                  {device.platform === "web_push"
-                    ? t("Browser", "Navegador", "Navegador")
-                    : t("Android", "Android", "Android")}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t("Last seen:", "Última atividade:", "Última actividad:")}{" "}
-                  {instantDisplay(device.last_seen_at)} ·{" "}
-                  {device.revoked_at
-                    ? t("Disabled", "Desativado", "Desactivado")
-                    : t("Active", "Ativo", "Activo")}
-                </p>
+              <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                {device.platform === "web_push" ? (
+                  <Globe
+                    className="mt-0.5 size-[18px] shrink-0"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Smartphone
+                    className="mt-0.5 size-[18px] shrink-0"
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="break-words">
+                    {device.device_label ||
+                      t(
+                        "Unnamed device",
+                        "Dispositivo sem nome",
+                        "Dispositivo sin nombre",
+                      )}{" "}
+                    ·{" "}
+                    {device.platform === "web_push"
+                      ? t("Browser", "Navegador", "Navegador")
+                      : t("Android", "Android", "Android")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("Last seen:", "Última atividade:", "Última actividad:")}{" "}
+                    {instantDisplay(device.last_seen_at)} ·{" "}
+                    {device.revoked_at
+                      ? t("Disabled", "Desativado", "Desactivado")
+                      : t("Active", "Ativo", "Activo")}
+                  </p>
+                </div>
               </div>
               {!device.revoked_at && (
                 <Button
@@ -918,8 +958,11 @@ function NotificationSettings({
         )}
         <div className="grid gap-3">
           {events.map((event) => (
-            <article key={event.id} className="space-y-2 rounded-lg border p-4">
-              <h4 className="font-semibold">{event.title}</h4>
+            <article
+              key={event.id}
+              className="space-y-1 rounded-[18px] border bg-card p-5 shadow-sm"
+            >
+              <h4 className="text-base font-semibold">{event.title}</h4>
               <p className="text-sm">
                 {localDisplay(event.dtstart_local)} · {event.timezone}
               </p>
@@ -1003,7 +1046,8 @@ function NotificationSettings({
                   </Button>
                   <Button
                     disabled={busy}
-                    variant="destructive"
+                    variant="ghost"
+                    className="text-destructive"
                     onClick={() => {
                       setError("");
                       setConfirmation({
@@ -1022,14 +1066,14 @@ function NotificationSettings({
         </div>
         {canCreate ? (
           <form
-            className="border-t pt-5"
+            className="mt-2 border-t pt-6"
             onSubmit={(e) => {
               e.preventDefault();
               saveEvent();
             }}
           >
             <fieldset disabled={busy} className="grid gap-4">
-              <legend className="mb-4 font-semibold">
+              <legend className="mb-4 text-base">
                 {editing
                   ? t(
                       "Edit scheduled event",
@@ -1042,99 +1086,124 @@ function NotificationSettings({
                       "Añadir evento programado",
                     )}
               </legend>
-              <Field
-                label={t("Title", "Título", "Título")}
-                required
-                maxLength={120}
-                value={draft.title}
-                onChange={(e) => updateDraft("title", e.target.value)}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  type="datetime-local"
-                  step="1"
-                  label={t("Local start", "Início local", "Inicio local")}
-                  required
-                  value={draft.start}
-                  onChange={(e) => updateDraft("start", e.target.value)}
-                />
+              <div>
+                <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                  {t("Event", "Evento", "Evento")}
+                </h4>
+                <div className="grid gap-4">
+                  <Field
+                    label={t("Title", "Título", "Título")}
+                    required
+                    maxLength={120}
+                    value={draft.title}
+                    onChange={(e) => updateDraft("title", e.target.value)}
+                  />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                      type="datetime-local"
+                      step="1"
+                      label={t("Local start", "Início local", "Inicio local")}
+                      required
+                      value={draft.start}
+                      onChange={(e) => updateDraft("start", e.target.value)}
+                    />
+                    <Field
+                      label={t(
+                        "Event timezone",
+                        "Fuso horário do evento",
+                        "Zona horaria del evento",
+                      )}
+                      required
+                      value={draft.timezone}
+                      onChange={(e) => updateDraft("timezone", e.target.value)}
+                      placeholder="Europe/Lisbon"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2">
+                <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                  {t("Repeats", "Repetição", "Repetición")}
+                </h4>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Choice
+                    disabled={busy}
+                    label={t("Frequency", "Frequência", "Frecuencia")}
+                    value={draft.frequency}
+                    onChange={(value) => updateDraft("frequency", value)}
+                    options={[
+                      ["DAILY", t("Daily", "Diária", "Diaria")],
+                      ["WEEKLY", t("Weekly", "Semanal", "Semanal")],
+                      ["MONTHLY", t("Monthly", "Mensal", "Mensual")],
+                    ]}
+                  />
+                  <Field
+                    type="number"
+                    min="1"
+                    max="366"
+                    step="1"
+                    label={t(
+                      "Interval (1–366)",
+                      "Intervalo (1–366)",
+                      "Intervalo (1–366)",
+                    )}
+                    required
+                    value={draft.interval}
+                    onChange={(e) => updateDraft("interval", e.target.value)}
+                  />
+                  <Field
+                    type="number"
+                    min="1"
+                    max="366"
+                    step="1"
+                    label={t(
+                      "Count (1–366, optional)",
+                      "Quantidade (1–366, opcional)",
+                      "Cantidad (1–366, opcional)",
+                    )}
+                    value={draft.count}
+                    onChange={(e) => updateDraft("count", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="mt-2">
+                <h4 className="mb-3 text-xs font-bold tracking-[0.8px] text-muted-foreground uppercase">
+                  {t(
+                    "Until and exceptions",
+                    "Até e exceções",
+                    "Hasta y excepciones",
+                  )}
+                </h4>
+                <div className="grid gap-4">
+                  <Field
+                    label={t(
+                      "Until (optional)",
+                      "Data final (opcional)",
+                      "Fecha final (opcional)",
+                    )}
+                    value={draft.until}
+                    onChange={(e) => updateDraft("until", e.target.value)}
+                    placeholder="2026-12-31T09:00"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    "Provide a count or an until date within one year. Until accepts a local date-time or RFC 5545 (YYYYMMDDTHHMMSS, optionally Z for UTC).",
+                    "Informe uma quantidade ou data final dentro de um ano. A data final aceita data e hora locais ou RFC 5545 (YYYYMMDDTHHMMSS, com Z opcional para UTC).",
+                    "Indica una cantidad o fecha final dentro de un año. La fecha final acepta fecha y hora locales o RFC 5545 (YYYYMMDDTHHMMSS, con Z opcional para UTC).",
+                  )}
+                </p>
                 <Field
                   label={t(
-                    "Event timezone",
-                    "Fuso horário do evento",
-                    "Zona horaria del evento",
+                    "Exception local times (comma-separated)",
+                    "Horários locais de exceção (separados por vírgula)",
+                    "Horas locales de excepción (separadas por comas)",
                   )}
-                  required
-                  value={draft.timezone}
-                  onChange={(e) => updateDraft("timezone", e.target.value)}
-                  placeholder="Europe/Lisbon"
-                />
-                <Choice
-                  disabled={busy}
-                  label={t("Frequency", "Frequência", "Frecuencia")}
-                  value={draft.frequency}
-                  onChange={(value) => updateDraft("frequency", value)}
-                  options={[
-                    ["DAILY", t("Daily", "Diária", "Diaria")],
-                    ["WEEKLY", t("Weekly", "Semanal", "Semanal")],
-                    ["MONTHLY", t("Monthly", "Mensal", "Mensual")],
-                  ]}
-                />
-                <Field
-                  type="number"
-                  min="1"
-                  max="366"
-                  step="1"
-                  label={t(
-                    "Interval (1–366)",
-                    "Intervalo (1–366)",
-                    "Intervalo (1–366)",
-                  )}
-                  required
-                  value={draft.interval}
-                  onChange={(e) => updateDraft("interval", e.target.value)}
-                />
-                <Field
-                  type="number"
-                  min="1"
-                  max="366"
-                  step="1"
-                  label={t(
-                    "Count (1–366, optional)",
-                    "Quantidade (1–366, opcional)",
-                    "Cantidad (1–366, opcional)",
-                  )}
-                  value={draft.count}
-                  onChange={(e) => updateDraft("count", e.target.value)}
-                />
-                <Field
-                  label={t(
-                    "Until (optional)",
-                    "Data final (opcional)",
-                    "Fecha final (opcional)",
-                  )}
-                  value={draft.until}
-                  onChange={(e) => updateDraft("until", e.target.value)}
-                  placeholder="2026-12-31T09:00"
+                  value={draft.exdates}
+                  onChange={(e) => updateDraft("exdates", e.target.value)}
+                  placeholder="2026-12-25T09:00:00"
                 />
               </div>
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  "Provide a count or an until date within one year. Until accepts a local date-time or RFC 5545 (YYYYMMDDTHHMMSS, optionally Z for UTC).",
-                  "Informe uma quantidade ou data final dentro de um ano. A data final aceita data e hora locais ou RFC 5545 (YYYYMMDDTHHMMSS, com Z opcional para UTC).",
-                  "Indica una cantidad o fecha final dentro de un año. La fecha final acepta fecha y hora locales o RFC 5545 (YYYYMMDDTHHMMSS, con Z opcional para UTC).",
-                )}
-              </p>
-              <Field
-                label={t(
-                  "Exception local times (comma-separated)",
-                  "Horários locais de exceção (separados por vírgula)",
-                  "Horas locales de excepción (separadas por comas)",
-                )}
-                value={draft.exdates}
-                onChange={(e) => updateDraft("exdates", e.target.value)}
-                placeholder="2026-12-25T09:00:00"
-              />
               {draft.extras && (
                 <p className="break-words text-sm">
                   {t(
