@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/roomies/backend/internal/betterauth"
+	"github.com/roomies/backend/internal/config"
 	"github.com/roomies/backend/internal/middleware"
 	"github.com/roomies/backend/internal/models"
 	"github.com/roomies/backend/internal/repository"
@@ -23,10 +24,15 @@ type AuthHandler struct {
 	limiter       *middleware.WindowLimiter
 	accountLimit  *middleware.WindowLimiter
 	native        nativeSignIns
+	company       *companyAuth
 }
 
-func NewAuthHandler(users *repository.UserRepository, auth *betterauth.Client, publicURL string) *AuthHandler {
-	return &AuthHandler{userRepo: users, auth: auth, publicBaseURL: publicURL, limiter: middleware.NewWindowLimiter(time.Minute), accountLimit: middleware.NewWindowLimiter(15 * time.Minute)}
+func NewAuthHandler(users *repository.UserRepository, auth *betterauth.Client, publicURL string, cfg ...*config.Config) *AuthHandler {
+	h := &AuthHandler{userRepo: users, auth: auth, publicBaseURL: publicURL, limiter: middleware.NewWindowLimiter(time.Minute), accountLimit: middleware.NewWindowLimiter(15 * time.Minute)}
+	if len(cfg) > 0 {
+		h.company, _ = newCompanyAuth(cfg[0], publicURL)
+	}
+	return h
 }
 func (h *AuthHandler) Config(w http.ResponseWriter, r *http.Request) {
 	google := false
@@ -35,15 +41,27 @@ func (h *AuthHandler) Config(w http.ResponseWriter, r *http.Request) {
 		var config struct {
 			Google bool `json:"google"`
 		}
-		if res.StatusCode == 200 {
+		if res.StatusCode == http.StatusOK {
 			_ = json.NewDecoder(io.LimitReader(res.Body, 1024)).Decode(&config)
 			google = config.Google
 		}
 	}
-	writeJSON(w, 200, map[string]any{"provider": "better-auth", "password": true, "google": google, "two_factor": true})
+	writeJSON(w, 200, map[string]any{"provider": map[bool]string{true: "companyauth", false: "better-auth"}[h.company != nil], "company_auth": h.company != nil, "password": h.company == nil, "google": google && h.company == nil, "two_factor": h.company == nil})
 }
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) { h.authenticate(w, r, true) }
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request)    { h.authenticate(w, r, false) }
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	if h.company != nil {
+		h.companyLogin(w, r)
+		return
+	}
+	h.authenticate(w, r, true)
+}
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	if h.company != nil {
+		h.companyLogin(w, r)
+		return
+	}
+	h.authenticate(w, r, false)
+}
 func (h *AuthHandler) authenticate(w http.ResponseWriter, r *http.Request, register bool) {
 	if !h.allowedOrigin(w, r) {
 		return

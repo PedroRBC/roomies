@@ -86,6 +86,8 @@ func migrations(driver string) []schemaMigration {
 		},
 		{version: 12, name: "auth_two_factor", up: execStatements(
 			`ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE`,
+			`ALTER TABLE users ADD COLUMN auth_sub TEXT`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_sub ON users(auth_sub) WHERE auth_sub IS NOT NULL AND auth_sub != ''`,
 			`CREATE TABLE auth_two_factor (
                 id TEXT PRIMARY KEY,
                 secret TEXT NOT NULL,

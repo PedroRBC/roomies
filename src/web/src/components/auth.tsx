@@ -23,21 +23,48 @@ export function Auth({
   const register = routeRegister ?? localRegister;
   const [factor, setFactor] = useState(false);
   const [backup, setBackup] = useState(false);
+  const [companyAuth, setCompanyAuth] = useState(false);
   const [google, setGoogle] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    void api<{ google: boolean }>("/auth/config")
+    void api<{ company_auth?: boolean; google?: boolean }>("/auth/config")
       .then((config) => {
-        if (active) setGoogle(config.google);
+        if (active) { setCompanyAuth(Boolean(config.company_auth)); setGoogle(Boolean(config.google)); setAuthReady(true); }
       })
       .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
+  if (authReady && companyAuth) {
+    return (
+      <div className="mx-auto flex w-full max-w-xl flex-1 items-center justify-center px-5 py-10">
+        <Card className="w-full max-w-[440px] p-8 text-center sm:p-10">
+          <div className="roomies-wordmark text-[52px]">Roomies</div>
+          <h1 className="mt-6 font-heading text-3xl font-semibold">{t("Welcome home", "Bem-vindo ao lar", "Bienvenido a casa")}</h1>
+          <p className="mt-3.5 text-base text-muted-foreground">{t("Sign in securely with your Caldas Studios account. Your password and two-factor authentication stay with CompanyAuth.", "Entre com segurança usando sua conta Caldas Studios. Sua senha e autenticação de dois fatores ficam no CompanyAuth.", "Inicia sesión de forma segura con tu cuenta de Caldas Studios. Tu contraseña y autenticación de dos factores permanecen en CompanyAuth.")}</p>
+          <Button className="mt-8 w-full" size="lg" onClick={() => window.location.assign(`/api/auth/${register ? "register" : "login"}`)}>
+            {register ? t("Create or use your account", "Criar ou usar sua conta", "Crear o usar tu cuenta") : t("Continue with CompanyAuth", "Continuar com CompanyAuth", "Continuar con CompanyAuth")}
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+  async function signInGoogle() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<{ url: string }>("/auth/google", { method: "POST" });
+      window.location.assign(result.url);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -68,19 +95,6 @@ export function Auth({
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBusy(false);
-    }
-  }
-  async function signInGoogle() {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<{ url: string }>("/auth/google", {
-        method: "POST",
-      });
-      window.location.assign(result.url);
-    } catch (err) {
-      setError((err as Error).message);
       setBusy(false);
     }
   }
@@ -245,6 +259,11 @@ export function Auth({
           </form>
           {factor ? (
             <>
+              {google && (
+                <Button variant="outline" disabled={busy} onClick={() => void signInGoogle()}>
+                  {t("Continue with Google", "Continuar com Google", "Continuar con Google")}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 disabled={busy}
@@ -279,19 +298,6 @@ export function Auth({
             </>
           ) : (
             <>
-              {google && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void signInGoogle()}
-                >
-                  {t(
-                    "Continue with Google",
-                    "Continuar com Google",
-                    "Continuar con Google",
-                  )}
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 disabled={busy}

@@ -46,7 +46,7 @@ func NewHandler(deps Dependencies) http.Handler {
 		isReady = func() bool { return true }
 	}
 
-	authHandler := handlers.NewAuthHandler(deps.UserRepo, deps.Auth, deps.Config.PublicBaseURL)
+	authHandler := handlers.NewAuthHandler(deps.UserRepo, deps.Auth, deps.Config.PublicBaseURL, deps.Config)
 	houseHandler := handlers.NewHouseHandler(deps.HouseRepo, deps.UserRepo, deps.ReliabilityRepo)
 	expenseHandler := handlers.NewExpenseHandler(deps.ExpenseRepo, deps.HouseRepo)
 	noteHandler := handlers.NewNoteHandler(deps.NoteRepo, deps.HouseRepo)
@@ -104,7 +104,10 @@ func NewHandler(deps Dependencies) http.Handler {
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Get("/config", authHandler.Config)
 		r.Post("/register", authHandler.Register)
+		r.Get("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
+		r.Get("/login", authHandler.Login)
+		r.Get("/callback/caldas", authHandler.CompanyCallback)
 		r.Post("/logout", authHandler.Logout)
 		r.Post("/two-factor/{action}", authHandler.TwoFactor)
 		r.Post("/google", authHandler.Google)

@@ -223,3 +223,11 @@ func IsAuthCookie(name string) bool {
 	}
 	return false
 }
+
+// CreateLocalSession creates the app session after a CompanyAuth OIDC login.
+func (c *Client) CreateLocalSession(ctx context.Context, userID string, source *http.Request) (*http.Response, error) {
+	if c.db == nil {
+		return nil, errors.New("local session storage is required")
+	}
+	return c.localSession(ctx, userID, source, http.StatusOK, time.Now().UTC())
+}
