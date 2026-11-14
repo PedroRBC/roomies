@@ -1,6 +1,12 @@
 import { StrictMode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api, ApiError } from "@/lib/api";
@@ -32,14 +38,22 @@ it("signs in with cookies and creates a first house", async () => {
   });
   const actor = userEvent.setup();
   render(<App />);
+  await actor.click(
+    await screen.findByRole("button", { name: "Use email and password" }),
+  );
   await actor.type(await screen.findByLabelText("Email"), "a@example.com");
   await actor.type(screen.getByLabelText("Password"), "password123");
   await actor.click(screen.getByRole("button", { name: "Sign in" }));
   await actor.type(await screen.findByLabelText("House name"), "Our home");
-  await actor.click(screen.getByRole("button", { name: "Create house" }));
+  await actor.click(
+    within(screen.getByLabelText("House name").closest("form")!).getByRole(
+      "button",
+      { name: "Create house" },
+    ),
+  );
   expect(
-    await screen.findByRole("button", { name: "Our home" }),
-  ).toBeInTheDocument();
+    await screen.findByRole("combobox", { name: "Your house" }),
+  ).toHaveTextContent("Our home");
   expect(api).toHaveBeenCalledWith("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: "a@example.com", password: "password123" }),
@@ -53,7 +67,7 @@ it("uses hosted sign-in exclusively when password auth is disabled", async () =>
   });
   render(<App />);
   expect(
-    await screen.findByRole("button", { name: "Continue with AuthKit" }),
+    await screen.findByRole("button", { name: "Sign in" }),
   ).toBeInTheDocument();
   expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
 });
@@ -101,8 +115,10 @@ it("shows a recoverable startup error instead of an empty login screen", async (
   expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
 });
 
-
-it.each([new Error("Network unavailable"), new ApiError(500, "Logout unavailable")])("clears the private workspace when logout fails: %s", async (failure) => {
+it.each([
+  new Error("Network unavailable"),
+  new ApiError(500, "Logout unavailable"),
+])("clears the private workspace when logout fails: %s", async (failure) => {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/auth/config") return { password: true, authkit: false };
     if (path === "/auth/me") return user;
@@ -112,11 +128,12 @@ it.each([new Error("Network unavailable"), new ApiError(500, "Logout unavailable
   const actor = userEvent.setup();
   render(<App />);
   await actor.click(await screen.findByRole("button", { name: "Sign out" }));
-  expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("button", { name: "Use email and password" }),
+  ).toBeInTheDocument();
   expect(screen.queryByLabelText("Navigation")).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent(failure.message);
 });
-
 
 it("opens create-house from the shared switcher", async () => {
   window.history.replaceState(null, "", "/dashboard");
@@ -128,8 +145,63 @@ it("opens create-house from the shared switcher", async () => {
   });
   const actor = userEvent.setup();
   render(<App />);
-  await actor.click(await screen.findByRole("combobox", { name: "Your house" }));
-  await actor.click(await screen.findByRole("option", { name: "Create house" }));
+  await actor.click(
+    await screen.findByRole("combobox", { name: "Your house" }),
+  );
+  await actor.click(
+    await screen.findByRole("option", { name: "Create house" }),
+  );
   expect(await screen.findByLabelText("House name")).toBeInTheDocument();
   expect(window.location.search).toBe("?create=1");
+});
+
+it("keeps password sign-in collapsed and allows hiding the form", async () => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, authkit: false };
+    throw new ApiError(401, "unauthorized");
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await screen.findByRole("button", { name: "Use email and password" });
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  await actor.click(
+    screen.getByRole("button", { name: "Use email and password" }),
+  );
+  expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  await actor.click(screen.getByRole("button", { name: "Hide" }));
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+});
+it("uses a single hosted entry when both auth methods are configured", async () => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, authkit: true };
+    throw new ApiError(401, "unauthorized");
+  });
+  render(<App />);
+  await screen.findByRole("button", { name: "Sign in" });
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Use email and password" }),
+  ).not.toBeInTheDocument();
+});
+
+it("closes the mobile drawer when a house section is selected", async () => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/me") return user;
+    if (path === "/houses") return [{ id: "one", name: "Our home" }];
+    if (path === "/houses/one") return { id: "one", name: "Our home" };
+    if (path.endsWith("/members"))
+      return [{ user_id: "me", user_name: "Alex", role: "admin" }];
+    return [];
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await actor.click(await screen.findByRole("button", { name: "Open menu" }));
+  const drawer = await screen.findByRole("dialog", { name: "Navigation" });
+  await actor.click(within(drawer).getByRole("button", { name: "Notes" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(window.location.pathname).toBe("/house/one");
+  expect(window.location.search).toBe("?tab=notes");
 });

@@ -288,7 +288,7 @@ function SummaryView({
         </CardHeader>
         <CardContent>
           {summary.expenses.length === 0 ? (
-            <p className="text-base">
+            <p className="text-base text-muted-foreground">
               {t(
                 "No expenses this month.",
                 "Nenhuma despesa neste mês.",
@@ -297,7 +297,7 @@ function SummaryView({
             </p>
           ) : (
             <>
-              <p className="mb-4 font-heading text-[22px] leading-[1.2] font-semibold text-primary tabular-nums">
+              <p className="mb-4 font-heading text-[22px] leading-[1.2] font-semibold text-[var(--accent-deep)] tabular-nums">
                 {t("Total:", "Total:", "Total:")} {money(cents / 100)}
               </p>
               <div
@@ -364,7 +364,7 @@ function SummaryView({
         </CardHeader>
         <CardContent>
           {summary.events.length === 0 ? (
-            <p className="text-base">
+            <p className="text-base text-muted-foreground">
               {t(
                 "Nothing coming up.",
                 "Nada agendado por agora.",
@@ -415,7 +415,7 @@ function SummaryView({
             setPaused(false);
         }}
       >
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader className="flex! flex-row items-center justify-between">
           <CardTitle className="font-sans text-base font-semibold">
             {t("House notes", "Notas da casa", "Notas de la casa")}
           </CardTitle>
@@ -428,7 +428,7 @@ function SummaryView({
         </CardHeader>
         <CardContent>
           {!note ? (
-            <p className="text-base">
+            <p className="text-base text-muted-foreground">
               {t("No notes yet.", "Nenhuma nota ainda.", "Aún no hay notas.")}
             </p>
           ) : (

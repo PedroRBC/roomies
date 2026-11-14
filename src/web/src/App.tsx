@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Home,
-  LogOut,
-  Settings as SettingsIcon,
-  LayoutDashboard,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Auth } from "@/components/auth";
 import type { AuthConfig } from "@/components/auth";
-import { Choice } from "@/components/choice";
+import { AppShell } from "@/components/app-shell";
 import { HouseWorkspace } from "@/components/house-workspace";
 import { Dashboard } from "@/features/dashboard";
 import { Settings } from "@/features/settings";
@@ -19,8 +13,7 @@ import {
   hasPendingInvitation,
 } from "@/features/invitation-state";
 import { PreferencesProvider, usePreferences } from "@/lib/preferences";
-import { houseLink, houseTabs, readRoute, useRoute } from "@/lib/navigation";
-import type { HouseTab } from "@/lib/navigation";
+import { houseLink, readRoute, useRoute } from "@/lib/navigation";
 import { api, ApiError, workosUrl } from "@/lib/api";
 import type { House, User } from "@/lib/api";
 async function bootstrap() {
@@ -179,16 +172,6 @@ function AppContent() {
     setUser(user);
   }
   const activeHouse = route.houseId || focus || houses[0]?.id || "";
-  const tabLabels: Record<HouseTab, string> = {
-    expenses: t("Expenses", "Despesas", "Gastos"),
-    notes: t("Notes", "Notas", "Notas"),
-    groceries: t("Groceries", "Compras", "Compras"),
-    chores: t("Chores", "Tarefas", "Tareas"),
-    calendar: t("Calendar", "Calendário", "Calendario"),
-    balances: t("Balances", "Saldos", "Saldos"),
-    notifications: t("Notifications", "Notificações", "Notificaciones"),
-    members: t("Members", "Membros", "Miembros"),
-  };
   let content;
   if (loading)
     content = (
@@ -278,150 +261,48 @@ function AppContent() {
       </div>
     );
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4"
-      >
-        {t("Skip to content", "Pular para o conteúdo", "Saltar al contenido")}
-      </a>
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
-          <Button
-            variant="ghost"
-            className="px-0 text-xl font-bold"
-            onClick={() => navigate(user ? "/dashboard" : "/")}
-          >
-            <Home className="text-primary" aria-hidden="true" />
-            Roomies
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            {user && (
-              <span className="text-sm text-muted-foreground">{user.name}</span>
-            )}
+    <AppShell
+      user={user}
+      houses={houses}
+      activeHouse={activeHouse}
+      route={route}
+      navigate={navigate}
+      onSelect={setFocus}
+      busy={busy}
+      onLogout={() =>
+        void run(async () => {
+          let result: { logout_url?: string } | undefined;
+          try {
+            result = await api<{ logout_url?: string }>("/auth/logout", {
+              method: "POST",
+            });
+          } finally {
+            onUnauthorized();
+          }
+          if (result?.logout_url)
+            window.location.assign(workosUrl(result.logout_url, "logout"));
+        })
+      }
+    >
+      {error && (
+        <Alert
+          variant="destructive"
+          className="mx-auto mb-4 w-full max-w-[920px]"
+        >
+          <AlertDescription>
+            {error}
             <Button
-              variant="ghost"
-              onClick={() => navigate("/settings")}
-              aria-label={t("Settings", "Configurações", "Ajustes")}
+              variant="outline"
+              size="sm"
+              className="ml-3"
+              onClick={() => window.location.reload()}
             >
-              <SettingsIcon aria-hidden="true" />
-              {t("Settings", "Configurações", "Ajustes")}
+              {t("Reload", "Recarregar", "Recargar")}
             </Button>
-            {user && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    let result: { logout_url?: string } | undefined;
-                    try {
-                      result = await api<{ logout_url?: string }>(
-                        "/auth/logout",
-                        { method: "POST" },
-                      );
-                    } finally {
-                      onUnauthorized();
-                    }
-                    if (result?.logout_url)
-                      window.location.assign(
-                        workosUrl(result.logout_url, "logout"),
-                      );
-                  })
-                }
-              >
-                <LogOut aria-hidden="true" />
-                {t("Sign out", "Sair", "Cerrar sesión")}
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-      <div
-        className={`mx-auto max-w-7xl ${user ? "grid items-start gap-6 md:grid-cols-[210px_1fr]" : ""}`}
-      >
-        {user && (
-          <aside
-            className="grid gap-5 border-b p-5 md:sticky md:top-0 md:min-h-[calc(100svh-73px)] md:border-r md:border-b-0"
-            aria-label={t("Navigation", "Navegação", "Navegación")}
-          >
-            <Button
-              variant={route.path === "/dashboard" ? "secondary" : "ghost"}
-              className="justify-start"
-              onClick={() => navigate("/dashboard")}
-            >
-              <LayoutDashboard aria-hidden="true" />
-              {t("Dashboard", "Painel", "Panel")}
-            </Button>
-            {houses.length > 0 && (
-              <Choice
-                label={t("Your house", "Sua casa", "Tu casa")}
-                value={
-                  houses.some((house) => house.id === activeHouse)
-                    ? activeHouse
-                    : houses[0].id
-                }
-                choices={[
-                  ...houses.map((house) => ({ value: house.id, label: house.name })),
-                  { value: "__create__", label: t("Create house", "Criar casa", "Crear casa") },
-                ]}
-                onChange={(id) => {
-                  if (id === "__create__") {
-                    navigate("/dashboard?create=1");
-                    return;
-                  }
-                  setFocus(id);
-                  if (route.houseId) navigate(houseLink(id, route.tab));
-                }}
-              />
-            )}
-            {activeHouse && (
-              <nav
-                aria-label={t(
-                  "House sections",
-                  "Seções da casa",
-                  "Secciones de la casa",
-                )}
-                className="flex flex-wrap gap-1 md:grid"
-              >
-                {houseTabs.map((tab) => (
-                  <Button
-                    key={tab}
-                    variant={
-                      route.houseId && route.tab === tab ? "secondary" : "ghost"
-                    }
-                    className="justify-start"
-                    onClick={() => navigate(houseLink(activeHouse, tab))}
-                    aria-current={
-                      route.houseId && route.tab === tab ? "page" : undefined
-                    }
-                  >
-                    {tabLabels[tab]}
-                  </Button>
-                ))}
-              </nav>
-            )}
-          </aside>
-        )}
-        <main id="main" className="min-w-0 px-5 py-6 sm:px-8 sm:py-9">
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>
-                {error}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-3"
-                  onClick={() => window.location.reload()}
-                >
-                  {t("Reload", "Recarregar", "Recargar")}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          {content}
-        </main>
-      </div>
-    </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      {content}
+    </AppShell>
   );
 }

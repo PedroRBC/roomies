@@ -1,3 +1,4 @@
+import { Home } from "lucide-react";
 import { useId } from "react";
 import { Label } from "./ui/label";
 import {
@@ -13,17 +14,21 @@ export function Choice({
   choices,
   onChange,
   disabled = false,
+  hideLabel = false,
 }: {
   label: string;
   value: string;
   choices: { value: string; label: string }[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  hideLabel?: boolean;
 }) {
   const id = useId();
   return (
     <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className={hideLabel ? "sr-only" : undefined}>
+        {label}
+      </Label>
       <Select
         value={value}
         onValueChange={(value) => {
@@ -31,7 +36,20 @@ export function Choice({
         }}
         disabled={disabled}
       >
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger
+          id={id}
+          className={
+            hideLabel
+              ? "h-10! w-full gap-2 bg-card px-3 font-semibold"
+              : "w-full"
+          }
+        >
+          {hideLabel && (
+            <Home
+              className="size-[18px] text-[var(--accent-deep)]"
+              aria-hidden="true"
+            />
+          )}
           <SelectValue>
             {choices.find((item) => item.value === value)?.label}
           </SelectValue>

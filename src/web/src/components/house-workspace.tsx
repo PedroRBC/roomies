@@ -39,7 +39,6 @@ const Notifications = lazy(() =>
 import { Members } from "@/features/members";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 export function HouseWorkspace({
   house,
   user,
@@ -132,12 +131,6 @@ export function HouseWorkspace({
   const Section = sections[tab];
   return (
     <section aria-label={loaded.house.name} className="grid gap-7">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold">{loaded.house.name}</h1>
-        <Badge variant="secondary">
-          {loaded.members.length} {t("roommates", "moradores", "compañeros")}
-        </Badge>
-      </header>
       <Suspense
         fallback={
           <p role="status">
