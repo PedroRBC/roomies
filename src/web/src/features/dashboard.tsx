@@ -297,15 +297,31 @@ function SummaryView({
       </p>
     );
   const note = summary.notes[index % summary.notes.length];
+  const upcomingCount =
+    (summary.agenda?.entries?.length ?? 0) +
+    summary.scheduled.filter((event) => event.enabled).length;
+  const memberCount = summary.members?.length ?? 0;
   const writable =
     summary.members?.some(
       (m) =>
         m.user_id === userId && (m.role === "admin" || m.role === "member"),
     ) ?? false;
   return (
-    <div className="grid gap-8 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{house.name}</p>
+    <div className="roomies-dashboard grid gap-7 py-1">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-2 text-sm font-semibold text-primary">{house.name}</p>
+          <h2 className="roomies-dashboard-greeting">
+            {t(`Good morning, ${user.name}`, `Bom dia, ${user.name}`, `Buenos días, ${user.name}`)}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            {t(
+              "A calm view of what is happening at home.",
+              "Uma visão tranquila do que está acontecendo em casa.",
+              "Una vista tranquila de lo que pasa en casa.",
+            )}
+          </p>
+        </div>
         <Button variant="outline" onClick={() => setRevision((v) => v + 1)}>
           {t("Refresh dashboard", "Atualizar painel", "Actualizar panel")}
         </Button>
@@ -319,7 +335,7 @@ function SummaryView({
           )}
         </p>
       )}
-      <div className="flex flex-wrap gap-2 border-b pb-5">
+      <div className="roomies-dashboard-actions flex flex-wrap gap-2">
         <Button
           disabled={!writable}
           onClick={() =>
@@ -364,7 +380,24 @@ function SummaryView({
           {t("Plan an event", "Planejar evento", "Planear evento")}
         </Button>
       </div>
-      <div className="grid items-start gap-8 lg:grid-cols-[1.15fr_1fr]">
+      <div className="roomies-dashboard-stats grid gap-3 sm:grid-cols-3">
+        <div className="roomies-dashboard-stat">
+          <span>{t("Coming up", "Próximos", "Próximos")}</span>
+          <strong>{upcomingCount}</strong>
+          <small>{t("events and reminders", "eventos e lembretes", "eventos y recordatorios")}</small>
+        </div>
+        <div className="roomies-dashboard-stat">
+          <span>{t("House notes", "Notas da casa", "Notas de la casa")}</span>
+          <strong>{summary.notes.length}</strong>
+          <small>{t("shared notes", "notas compartilhadas", "notas compartidas")}</small>
+        </div>
+        <div className="roomies-dashboard-stat">
+          <span>{t("Members", "Membros", "Miembros")}</span>
+          <strong>{memberCount}</strong>
+          <small>{t("people in this home", "pessoas nesta casa", "personas en esta casa")}</small>
+        </div>
+      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="grid gap-6">
           <DashboardAgenda
             onOpen={(tab) => openTask(tab)}
@@ -375,10 +408,59 @@ function SummaryView({
             navigate={navigate}
           />
         </div>
-        <div
-          ref={shopping}
-          className="border-t pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8"
-        >
+        <div className="grid gap-6">
+          <Card
+            className="roomies-dashboard-note gap-2"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            onFocusCapture={() => setPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+            }}
+          >
+            <CardHeader className="flex! flex-row items-center justify-between">
+              <CardTitle className="font-sans text-base font-semibold">
+                {t("House notes", "Notas da casa", "Notas de la casa")}
+              </CardTitle>
+              <Button variant="ghost" onClick={() => openTask("notes")}>
+                {t("Open notes", "Ver notas", "Ver notas")}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!note ? (
+                <p className="text-base text-muted-foreground">
+                  {summary.notesUnavailable
+                    ? t("Notes unavailable. Refresh to retry.", "Notas indisponíveis. Atualize para tentar novamente.", "Notas no disponibles. Actualiza para reintentar.")
+                    : t("No notes yet.", "Nenhuma nota ainda.", "Aún no hay notas.")}
+                </p>
+              ) : (
+                <div
+                  onPointerDown={(event) => { swipe.current = event.clientX; }}
+                  onPointerUp={(event) => {
+                    const start = swipe.current;
+                    if (start !== null && Math.abs(event.clientX - start) > 40)
+                      setIndex((value) => (value + (event.clientX < start ? 1 : summary.notes.length - 1)) % summary.notes.length);
+                    swipe.current = null;
+                  }}
+                >
+                  <div className="rounded-xl border bg-background/70 p-4">
+                    <h3 className="text-lg font-bold tracking-tight">{note.title}</h3>
+                    <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed">{note.content}</p>
+                  </div>
+                  {summary.notes.length > 1 && (
+                    <div className="mt-3 flex items-center justify-center gap-1.5" aria-label={t("House notes", "Notas da casa", "Notas de la casa")}>
+                      {summary.notes.map((item, i) => (
+                        <button key={item.id} type="button" aria-label={`${t("Open note", "Abrir nota", "Abrir nota")} ${i + 1}: ${item.title}`} aria-pressed={i === index % summary.notes.length} onClick={() => setIndex(i)} className="flex size-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring">
+                          <span className={`h-1.5 rounded-full ${i === index % summary.notes.length ? "w-4 bg-primary" : "w-1.5 bg-border"}`} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <div ref={shopping} className="roomies-dashboard-shopping">
           <Suspense
             fallback={
               <p role="status">
@@ -411,6 +493,7 @@ function SummaryView({
               </p>
             )}
           </Suspense>
+          </div>
         </div>
       </div>
       <details className="border-y py-4">
@@ -448,95 +531,6 @@ function SummaryView({
           )}
         </div>
       </details>
-      <Card
-        className="gap-2"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onFocusCapture={() => setPaused(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget))
-            setPaused(false);
-        }}
-      >
-        <CardHeader className="flex! flex-row items-center justify-between">
-          <CardTitle className="font-sans text-base font-semibold">
-            {t("House notes", "Notas da casa", "Notas de la casa")}
-          </CardTitle>
-          <Button variant="ghost" onClick={() => openTask("notes")}>
-            {t("Open notes", "Ver notas", "Ver notas")}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {!note ? (
-            <p className="text-base text-muted-foreground">
-              {summary.notesUnavailable
-                ? t(
-                    "Notes unavailable. Refresh to retry.",
-                    "Notas indisponíveis. Atualize para tentar novamente.",
-                    "Notas no disponibles. Actualiza para reintentar.",
-                  )
-                : t(
-                    "No notes yet.",
-                    "Nenhuma nota ainda.",
-                    "Aún no hay notas.",
-                  )}
-            </p>
-          ) : (
-            <div
-              onPointerDown={(event) => {
-                swipe.current = event.clientX;
-              }}
-              onPointerUp={(event) => {
-                const start = swipe.current;
-                if (start !== null && Math.abs(event.clientX - start) > 40)
-                  setIndex(
-                    (value) =>
-                      (value +
-                        (event.clientX < start
-                          ? 1
-                          : summary.notes.length - 1)) %
-                      summary.notes.length,
-                  );
-                swipe.current = null;
-              }}
-            >
-              <div className="rounded-[14px] border bg-background p-4">
-                <h3 className="text-[19px] font-bold tracking-[-0.1px]">
-                  {note.title}
-                </h3>
-                <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-base leading-[1.45]">
-                  {note.content}
-                </p>
-              </div>
-              {summary.notes.length > 1 && (
-                <div
-                  className="mt-3 flex items-center justify-center gap-1.5"
-                  aria-label={t(
-                    "House notes",
-                    "Notas da casa",
-                    "Notas de la casa",
-                  )}
-                >
-                  {summary.notes.map((item, i) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-label={`${t("Open note", "Abrir nota", "Abrir nota")} ${i + 1}: ${item.title}`}
-                      aria-pressed={i === index % summary.notes.length}
-                      onClick={() => setIndex(i)}
-                      className="flex size-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
-                    >
-                      <span
-                        className={`h-1.5 rounded-full ${i === index % summary.notes.length ? "w-4 bg-primary" : "w-1.5 bg-border"}`}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
       <Dialog
         open={task !== null}
         onOpenChange={(open) => {

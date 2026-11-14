@@ -230,3 +230,45 @@
   color: var(--muted-foreground);
   z-index: 1;
 }
+
+.roomies-dashboard-greeting {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+.roomies-dashboard-actions {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+}
+.roomies-dashboard-actions > button:first-child {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.roomies-dashboard-stat {
+  display: grid;
+  gap: 0.1rem;
+  border-top: 2px solid var(--border);
+  padding: 0.85rem 0.15rem 0.35rem;
+}
+.roomies-dashboard-stat span {
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.roomies-dashboard-stat strong {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.roomies-dashboard-stat small {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}
+.roomies-dashboard-note,
+.roomies-dashboard-shopping {
+  min-width: 0;
+}
