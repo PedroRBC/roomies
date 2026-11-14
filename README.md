@@ -147,7 +147,7 @@ Optional backend variables (email invitations, Web Push, FCM) are listed with co
 
 **Google sign-in (optional).** Create a Web application OAuth client in Google Cloud, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, and register `{ROOMIES_PUBLIC_BASE_URL}/api/auth/callback/google` as an authorized redirect URI (for local development: `http://localhost:8080/api/auth/callback/google`). Restart the auth service after changing these values. The Google button appears when both values are configured. Existing password accounts remain intact; accounts with the same email are not linked automatically. Sign in using the method that created the account.
 
-**Authenticator app 2FA.** In Settings → Account security (or Account security in the alternative web client), set up an authenticator such as Google Authenticator, 1Password or Aegis. Scan the QR code or enter the setup key, save the single-use recovery codes, and confirm a 6-digit code to activate 2FA. Both password and Google sign-ins then require the second factor. No email or SMTP is involved. Disable 2FA with a current authenticator code (or an unused recovery code) and your password; Google-only accounts can leave the password blank. If you signed in within the last five minutes, you can leave the code blank, including after using your final recovery code. Recovery codes sign you in if the authenticator is lost. There is no email account recovery, so keep the recovery codes safe.
+**Authenticator app 2FA.** In Settings → Account security (or Settings → Two-factor authentication in the alternative web client), set up an authenticator such as Google Authenticator, 1Password or Aegis. Scan the QR code or enter the setup key, save the single-use recovery codes, and confirm a 6-digit code to activate 2FA. Both password and Google sign-ins then require the second factor. No email or SMTP is involved. Disable 2FA with a current authenticator code (or an unused recovery code) and your password; Google-only accounts can leave the password blank. If you signed in within the last five minutes, you can leave the code blank, including after using your final recovery code. Recovery codes sign you in if the authenticator is lost. There is no email account recovery, so keep the recovery codes safe.
 
 On Android, Windows and Linux, Google opens in the system browser. Complete 2FA there if requested, confirm the displayed account, then return to Roomies. The app polls for a single-use handoff for up to five minutes; session tokens never appear in URLs. Restart sign-in if the API restarts during this handoff. Browser and native app share the resulting session, so signing out of that browser session revokes it in the app too.
 
@@ -177,7 +177,7 @@ Open <http://localhost:8080/> and sign up with any email and password. This star
 
 ### Alternative web client
 
-The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy, uses HttpOnly cookie sessions, and supports email/password sign-in, house creation and switching, shared equal-split expenses, balances, settlement suggestions, and notes. Amounts currently display in USD. Other household features and editing/deletion remain available in Flutter.
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy and uses HttpOnly cookie sessions. It supports email/password, optional Google OAuth and authenticator 2FA, invitations, house switching and administration, expense splits and privacy, balances and settlement suggestions, notes, groceries, chores, calendar, notification preferences, scheduled reminders, and browser Web Push. The dashboard shows monthly spending, upcoming items, and rotating notes. Settings include English, Portuguese and Spanish, display currency, appearance, mint or plum accent, and a default house. Currency settings change formatting; they do not convert amounts.
 
 Select the alternative on the same origin and port as Flutter (only one can use that port):
 
@@ -194,6 +194,8 @@ docker compose up --build -d web
 ```
 
 The alternative is built locally; the published self-hosting image above continues to serve Flutter.
+
+House sections support deep links: `/house/{id}?tab=expenses` (also `notes`, `groceries`, `chores`, `calendar`, `balances`, `notifications`, and `members`). Invitations use `/accept-invitation?token=...`; `/dashboard?create=1` opens house creation. Browser push requires HTTPS or localhost, notification permission, and configured server Web Push keys. Neither client moves money when suggesting settlements.
 
 Checks and tools:
 

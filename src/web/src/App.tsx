@@ -1,31 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SubmitEvent } from "react";
-import { Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Security } from "@/components/security";
 import { Auth } from "@/components/auth";
-import { Field } from "@/components/field";
+import { Security } from "@/components/security";
+import { AppShell } from "@/components/app-shell";
 import { HouseWorkspace } from "@/components/house-workspace";
+import { Dashboard } from "@/features/dashboard";
+import { Settings } from "@/features/settings";
+import { AcceptInvitation } from "@/features/invitation";
+import {
+  captureInvitation,
+  hasPendingInvitation,
+} from "@/features/invitation-state";
+import { PreferencesProvider, usePreferences } from "@/lib/preferences";
+import { houseLink, readRoute, useRoute } from "@/lib/navigation";
 import { api, ApiError } from "@/lib/api";
 import type { House, User } from "@/lib/api";
-
 async function bootstrap() {
+  captureInvitation();
   let user: User | null = null;
   try {
     user = await api<User>("/auth/me");
@@ -34,23 +26,41 @@ async function bootstrap() {
   }
   return { user };
 }
-
 export default function App() {
-  const [security, setSecurity] = useState(false);
+  return (
+    <PreferencesProvider>
+      <AppContent />
+    </PreferencesProvider>
+  );
+}
+function AppContent() {
+  const { t, preferences, setPreference } = usePreferences();
+  const route = useRoute();
+  const { navigate } = route;
   const [user, setUser] = useState<User | null>(null);
   const [houses, setHouses] = useState<House[]>([]);
-  const [selected, setSelected] = useState("");
+  const [focus, setFocus] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [houseLoading, setHouseLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
   const startup = useRef<ReturnType<typeof bootstrap> | null>(null);
+  const freshLogin = useRef(false);
+  const defaultHouse = useRef(preferences.defaultHouse);
+  useEffect(() => {
+    defaultHouse.current = preferences.defaultHouse;
+  }, [preferences.defaultHouse]);
   const onUnauthorized = useCallback(() => {
     setUser(null);
     setHouses([]);
-    setSelected("");
-  }, []);
-
+    setFocus("");
+    navigate("/", true);
+  }, [navigate]);
+  const refreshHouses = useCallback(
+    () => setRevision((value) => value + 1),
+    [],
+  );
   useEffect(() => {
     let active = true;
     startup.current ??= bootstrap();
@@ -70,17 +80,32 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, []);
-
+  }, [navigate]);
   useEffect(() => {
     if (!user) return;
     let active = true;
     api<House[]>("/houses")
       .then((result) => {
-        if (active) {
-          setHouses(result);
-          setSelected(result[0]?.id ?? "");
-        }
+        if (!active) return;
+        setHouses(result);
+        const preferred =
+          result.find((house) => house.id === defaultHouse.current)?.id ??
+          result[0]?.id ??
+          "";
+        setFocus((value) =>
+          result.some((house) => house.id === value) ? value : preferred,
+        );
+        const current = readRoute();
+        if (hasPendingInvitation()) navigate("/accept-invitation", true);
+        else if (["/", "/register", "/callback"].includes(current.path))
+          navigate(
+            !freshLogin.current &&
+              result.some((house) => house.id === defaultHouse.current)
+              ? houseLink(defaultHouse.current)
+              : "/dashboard",
+            true,
+          );
+        freshLogin.current = false;
       })
       .catch((err: ApiError) => {
         if (active) {
@@ -94,8 +119,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [user, onUnauthorized]);
-
+  }, [user, revision, navigate, onUnauthorized]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -108,168 +132,149 @@ export default function App() {
       setBusy(false);
     }
   }
-  function createHouse(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const name = String(new FormData(form).get("name")).trim();
-    void run(async () => {
+  async function createHouse(name: string) {
+    try {
       const house = await api<House>("/houses", {
         method: "POST",
         body: JSON.stringify({ name }),
       });
       setHouses((current) => [...current, house]);
-      setSelected(house.id);
-      form.reset();
-    });
+      setFocus(house.id);
+      setPreference("defaultHouse", house.id);
+    } catch (err) {
+      if ((err as ApiError).status === 401) onUnauthorized();
+      throw err;
+    }
   }
-  const house = houses.find((item) => item.id === selected);
+  function login(user: User) {
+    freshLogin.current = true;
+    setHouseLoading(true);
+    setUser(user);
+  }
+  const activeHouse = route.houseId || focus || houses[0]?.id || "";
+  let content;
+  if (loading)
+    content = (
+      <p role="status">
+        {t("Opening Roomies…", "Abrindo Roomies…", "Abriendo Roomies…")}
+      </p>
+    );
+  else if (route.path === "/settings")
+    content = (
+      <div className="mx-auto w-full max-w-[520px]">
+        {user && <Security user={user} onChange={setUser} />}
+        <Settings
+          user={user}
+          houses={houses}
+          onRefresh={refreshHouses}
+          onUnauthorized={onUnauthorized}
+        />
+      </div>
+    );
+  else if (!user)
+    content = (
+      <Auth
+        onLogin={login}
+        register={route.path === "/register"}
+        navigate={navigate}
+      />
+    );
+  else if (houseLoading)
+    content = (
+      <p role="status">
+        {t(
+          "Loading your houses…",
+          "Carregando suas casas…",
+          "Cargando tus casas…",
+        )}
+      </p>
+    );
+  else if (route.path === "/accept-invitation")
+    content = (
+      <AcceptInvitation
+        onJoined={(houseId) => {
+          refreshHouses();
+          setFocus(houseId);
+          navigate(houseLink(houseId), true);
+        }}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  else if (route.houseId)
+    content = (
+      <HouseWorkspace
+        key={route.houseId}
+        house={
+          houses.find((house) => house.id === route.houseId) ?? {
+            id: route.houseId,
+            name: "",
+          }
+        }
+        user={user}
+        tab={route.tab}
+        onUnauthorized={onUnauthorized}
+        onChanged={refreshHouses}
+      />
+    );
+  else if (["/dashboard", "/", "/callback", "/register"].includes(route.path))
+    content = (
+      <Dashboard
+        user={user}
+        houses={houses}
+        createRequested={route.create}
+        selected={focus}
+        onSelect={setFocus}
+        onCreate={createHouse}
+        navigate={navigate}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  else
+    content = (
+      <div className="grid gap-4">
+        <h1 className="text-3xl">
+          {t("Page not found", "Página não encontrada", "Página no encontrada")}
+        </h1>
+        <Button onClick={() => navigate("/dashboard")}>
+          {t("Go to dashboard", "Ir ao painel", "Ir al panel")}
+        </Button>
+      </div>
+    );
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4"
-      >
-        Skip to content
-      </a>
-      {user && (
-        <header className="border-b bg-card">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
-            <span className="flex items-center gap-2 text-xl font-bold">
-              <Home className="text-primary" aria-hidden="true" />
-              Roomies
-            </span>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">{user.name}</span>
-              <Button variant="ghost" size="sm" onClick={() => setSecurity(!security)}>Account security</Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await api("/auth/logout", { method: "POST" });
-                    onUnauthorized();
-                  })
-                }
-              >
-                <LogOut size={16} aria-hidden="true" />
-                Sign out
-              </Button>
-            </div>
-          </div>
-        </header>
-      )}
-      <main id="main" className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-9">
-        {user && security && <Security user={user} onChange={setUser} />}
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>
-              <span>{error}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => window.location.reload()}
-              >
-                Reload
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        {loading ? (
-          <p role="status">Opening Roomies…</p>
-        ) : !user ? (
-          (
-            <Auth
-              onLogin={(user) => {
-                setHouseLoading(true);
-                setUser(user);
-              }}
-            />
-          )
-        ) : (
-          <div className="grid items-start gap-9 md:grid-cols-[220px_1fr] lg:gap-12">
-            <aside
-              className="grid gap-6 md:sticky md:top-8"
-              aria-label="Households"
+    <AppShell
+      user={user}
+      houses={houses}
+      activeHouse={activeHouse}
+      route={route}
+      navigate={navigate}
+      onSelect={setFocus}
+      busy={busy}
+      onLogout={() =>
+        void run(async () => {
+          await api("/auth/logout", { method: "POST" });
+          onUnauthorized();
+        })
+      }
+    >
+      {error && (
+        <Alert
+          variant="destructive"
+          className="mx-auto mb-4 w-full max-w-[920px]"
+        >
+          <AlertDescription>
+            {error}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-3"
+              onClick={() => window.location.reload()}
             >
-              {houses.length > 0 && (
-                <div className="grid gap-2">
-                  <Label htmlFor="house">Your house</Label>
-                  <Select
-                    value={selected}
-                    onValueChange={(value) => {
-                      if (value) setSelected(value);
-                    }}
-                  >
-                    <SelectTrigger id="house" className="w-full">
-                      <SelectValue placeholder="Choose a house">
-                        {house?.name}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {houses.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {houses.length
-                      ? "Another shared space?"
-                      : "Start your household"}
-                  </CardTitle>
-                  <CardDescription>
-                    Create a house for your roommates.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={createHouse} className="grid gap-3">
-                    <Field
-                      label="House name"
-                      name="name"
-                      required
-                      maxLength={100}
-                    />
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      disabled={busy || houseLoading}
-                    >
-                      Create house
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </aside>
-            {houseLoading ? (
-              <p role="status">Loading your houses…</p>
-            ) : house ? (
-              <HouseWorkspace
-                key={house.id}
-                house={house}
-                user={user}
-                onUnauthorized={onUnauthorized}
-              />
-            ) : (
-              <div className="py-12">
-                <h1 className="text-3xl font-semibold tracking-tight">
-                  A place for the things you share.
-                </h1>
-                <p className="mt-4 max-w-md leading-relaxed text-muted-foreground">
-                  Create your first house to track expenses, see who owes what,
-                  and keep everyone on the same page.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+              {t("Reload", "Recarregar", "Recargar")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {content}
+    </AppShell>
   );
 }

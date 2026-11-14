@@ -1,110 +1,80 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { HouseWorkspace } from "./house-workspace";
+import { PreferencesProvider } from "@/lib/preferences";
 import { api, ApiError } from "@/lib/api";
-
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   api: vi.fn(),
 }));
+vi.mock("@/features/expenses", () => ({
+  Expenses: ({ houseId, role }: { houseId: string; role: string | null }) => (
+    <div>
+      Expenses for {houseId}: {role}
+    </div>
+  ),
+}));
+vi.mock("@/features/notes", () => ({ Notes: () => <div>Notes section</div> }));
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
 });
 const user = { id: "me", name: "Alex", email: "a@example.com" };
 const onUnauthorized = vi.fn();
-function respond(role = "member") {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path.endsWith("/members"))
-      return [{ user_id: "me", user_name: "Alex", role }];
-    if (path.endsWith("/balances")) return { balances: [], settlements: [] };
-    return [];
-  });
-}
-function workspace(id = "one") {
+function workspace(id = "one", tab: "expenses" | "notes" = "expenses") {
   return (
-    <HouseWorkspace
-      key={id}
-      house={{ id, name: id }}
-      user={user}
-      onUnauthorized={onUnauthorized}
-    />
+    <PreferencesProvider>
+      <HouseWorkspace
+        key={id}
+        house={{ id, name: id }}
+        user={user}
+        tab={tab}
+        onUnauthorized={onUnauthorized}
+      />
+    </PreferencesProvider>
   );
 }
-
-it("retains expense input and shows validation errors when a save fails", async () => {
+function respond() {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path.endsWith("/members")
+      ? [{ user_id: "me", user_name: "Alex", role: "monitor" }]
+      : { id: path.split("/").at(-1), name: "Our home" },
+  );
+}
+it("loads membership and passes the correct read-only role to the active feature", async () => {
   respond();
-  const actor = userEvent.setup();
   render(workspace());
-  await actor.type(
-    await screen.findByLabelText("What was it for?"),
-    "Groceries",
-  );
-  await actor.type(screen.getByLabelText("Amount (USD)"), "12.34");
-  vi.mocked(api).mockRejectedValueOnce(new ApiError(400, "invalid expense"));
-  await actor.click(screen.getByRole("button", { name: "Add expense" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("invalid expense");
-  expect(screen.getByLabelText("What was it for?")).toHaveValue("Groceries");
-  expect(api).toHaveBeenCalledWith(
-    "/houses/one/expenses",
-    expect.objectContaining({
-      method: "POST",
-      body: expect.stringContaining('"amount":12.34'),
-    }),
-  );
-});
-
-it("keeps monitors read-only", async () => {
-  respond("monitor");
-  render(workspace());
-  await screen.findByText(
-    "No expenses yet. Add the first thing you paid for together.",
-  );
   expect(
-    screen.queryByRole("button", { name: "Add expense" }),
-  ).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("tab", { name: "Notes" }));
-  expect(
-    screen.queryByRole("button", { name: "Add note" }),
-  ).not.toBeInTheDocument();
+    await screen.findByText("Expenses for one: monitor"),
+  ).toBeInTheDocument();
 });
-
-it("never renders late responses from a house after switching houses", async () => {
+it("uses the active route section", async () => {
+  respond();
+  render(workspace("one", "notes"));
+  expect(await screen.findByText("Notes section")).toBeInTheDocument();
+  expect(screen.queryByText(/Expenses for/)).not.toBeInTheDocument();
+});
+it("does not render responses from a house after switching houses", async () => {
   let finish!: (value: unknown) => void;
-  const oldExpenses = new Promise((resolve) => {
+  const old = new Promise((resolve) => {
     finish = resolve;
   });
   respond();
   const normal = vi.mocked(api).getMockImplementation()!;
   vi.mocked(api).mockImplementation((path, options) =>
-    path === "/houses/one/expenses"
-      ? (oldExpenses as ReturnType<typeof api>)
+    path === "/houses/one"
+      ? (old as ReturnType<typeof api>)
       : normal(path, options),
   );
   const view = render(workspace());
   view.rerender(workspace("two"));
-  await screen.findByText(
-    "No expenses yet. Add the first thing you paid for together.",
-  );
-  finish([
-    {
-      id: "old",
-      description: "Private old house data",
-      amount: 12,
-      date: "2026-11-13",
-      payer_name: "Alex",
-    },
-  ]);
+  await screen.findByText("Expenses for two: monitor");
+  finish({ id: "one", name: "Old private house" });
   await waitFor(() =>
-    expect(
-      screen.queryByText("Private old house data"),
-    ).not.toBeInTheDocument(),
+    expect(screen.queryByText("Old private house")).not.toBeInTheDocument(),
   );
-  expect(screen.getByRole("region", { name: "two" })).toBeInTheDocument();
 });
-
-it("returns to sign-in on an expired session", async () => {
+it("returns to sign-in on expired membership sessions", async () => {
   vi.mocked(api).mockRejectedValue(new ApiError(401, "unauthorized"));
   render(workspace());
   await waitFor(() => expect(onUnauthorized).toHaveBeenCalledOnce());
