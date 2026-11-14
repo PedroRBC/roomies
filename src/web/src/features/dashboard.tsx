@@ -76,7 +76,7 @@ export function Dashboard({
     }
   }
   return (
-    <section className="mx-auto w-full max-w-[1200px]">
+    <section className="mx-auto w-full max-w-[1040px]">
       <div className="roomies-page-heading mb-4">
         <h1 className="roomies-page-title">{t("Today", "Hoje", "Hoy")}</h1>
       </div>

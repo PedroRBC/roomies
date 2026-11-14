@@ -2,19 +2,21 @@ import type { Balances as BalanceResponse } from "@/lib/api";
 import { housePath } from "@/lib/features";
 import type { FeatureProps } from "@/lib/features";
 import { usePreferences } from "@/lib/preferences";
-import { LoaderCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { LoaderCircle, Wallet } from "lucide-react";
 import { useFinanceResource } from "./finance-resource";
 import { FinanceError } from "./finance-ui";
 
 export function Balances(props: FeatureProps) {
   return <HouseBalances key={`${props.houseId}:${props.user.id}`} {...props} />;
 }
-function HouseBalances({ houseId, onUnauthorized }: FeatureProps) {
+function HouseBalances({ houseId, user, onUnauthorized }: FeatureProps) {
   const { t, money } = usePreferences();
   const { data, loading, error, reload } = useFinanceResource<BalanceResponse>(
     `${housePath(houseId)}/balances`,
     onUnauthorized,
   );
+  const ownBalance = data?.balances.find((entry) => entry.user_id === user.id);
   return (
     <section
       aria-label={t("Balances", "Saldos", "Saldos")}
@@ -53,6 +55,15 @@ function HouseBalances({ houseId, onUnauthorized }: FeatureProps) {
           </p>
         ) : (
           <>
+            {ownBalance && (
+              <Card role="region" aria-label={t("Your balance", "Seu saldo", "Tu saldo")} className="border-0 bg-primary text-primary-foreground shadow-none">
+                <CardContent className="py-3">
+                  <p className="flex items-center gap-2 text-sm"><Wallet className="size-4" aria-hidden="true" />{t("Your balance", "Seu saldo", "Tu saldo")}</p>
+                  <p className="mt-3 break-words text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{money(Math.abs(ownBalance.net))}</p>
+                  <p className="mt-2 text-sm">{ownBalance.net < 0 ? t("You owe", "Você deve", "Debes") : ownBalance.net > 0 ? t("You are owed", "Você tem a receber", "Te deben") : t("You are all settled up", "Está tudo acertado", "Todo está saldado")}</p>
+                </CardContent>
+              </Card>
+            )}
             {data.balances.map((entry) => (
               <article
                 key={entry.user_id}

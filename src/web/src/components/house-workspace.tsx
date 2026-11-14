@@ -162,7 +162,7 @@ export function HouseWorkspace({
         { tab: "notes", label: t("Noticeboard", "Mural", "Tablón") },
       ];
   return (
-    <section aria-label={loaded.house.name} className="grid gap-7">
+    <section aria-label={loaded.house.name} className="grid min-w-0 gap-7">
       {!management && !quick && (
         <>
           <div className="flex flex-wrap items-end justify-between gap-4">
