@@ -79,6 +79,11 @@ func migrations(driver string) []schemaMigration {
 				`CREATE INDEX IF NOT EXISTS idx_revoked_sessions_expires ON revoked_sessions(expires_at)`,
 			),
 		},
+		{
+			version: 11,
+			name:    "better_auth",
+			up:      execStatements(betterAuthStatements()...),
+		},
 	}
 }
 
@@ -334,4 +339,54 @@ var migrationStatementsV2 = []string{
 	`UPDATE expense_splits
 		SET share_amount_cents = CAST(ROUND(share_amount * 100) AS BIGINT),
 		    share_amount = CAST(ROUND(share_amount * 100) AS BIGINT) / 100.0`,
+}
+
+func betterAuthStatements() []string {
+	return []string{
+		`ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE`,
+		`ALTER TABLE users ADD COLUMN image TEXT`,
+		`ALTER TABLE users ADD COLUMN updated_at TIMESTAMP`,
+		`UPDATE users SET updated_at = created_at`,
+		`CREATE TABLE auth_session (
+   id TEXT PRIMARY KEY,
+   "expiresAt" TIMESTAMP NOT NULL,
+   token TEXT NOT NULL UNIQUE,
+   "createdAt" TIMESTAMP NOT NULL,
+   "updatedAt" TIMESTAMP NOT NULL,
+   "ipAddress" TEXT,
+   "userAgent" TEXT,
+   "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  )`,
+		`CREATE INDEX idx_auth_session_user ON auth_session("userId")`,
+		`CREATE TABLE auth_account (
+   id TEXT PRIMARY KEY,
+   "accountId" TEXT NOT NULL,
+   "providerId" TEXT NOT NULL,
+   "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+   "accessToken" TEXT,
+   "refreshToken" TEXT,
+   "idToken" TEXT,
+   "accessTokenExpiresAt" TIMESTAMP,
+   "refreshTokenExpiresAt" TIMESTAMP,
+   scope TEXT,
+   password TEXT,
+   "createdAt" TIMESTAMP NOT NULL,
+   "updatedAt" TIMESTAMP NOT NULL,
+   UNIQUE("providerId", "accountId")
+  )`,
+		`CREATE INDEX idx_auth_account_user ON auth_account("userId")`,
+		`CREATE TABLE auth_verification (
+   id TEXT PRIMARY KEY,
+   identifier TEXT NOT NULL,
+   value TEXT NOT NULL,
+   "expiresAt" TIMESTAMP NOT NULL,
+   "createdAt" TIMESTAMP NOT NULL,
+   "updatedAt" TIMESTAMP NOT NULL
+  )`,
+		`CREATE INDEX idx_auth_verification_identifier ON auth_verification(identifier)`,
+		// Preserve local password hashes without inventing credentials for hosted-only accounts.
+		`INSERT INTO auth_account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+   SELECT 'credential:' || id, id, 'credential', id, password_hash, created_at, created_at
+   FROM users WHERE password_hash != ''`,
+	}
 }

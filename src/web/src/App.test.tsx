@@ -1,4 +1,3 @@
-import { StrictMode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -18,7 +17,7 @@ const user = { id: "me", name: "Alex", email: "a@example.com" };
 
 it("signs in with cookies and creates a first house", async () => {
   vi.mocked(api).mockImplementation(async (path, options) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/config") return { password: true, provider: "better-auth" };
     if (path === "/auth/me") throw new ApiError(401, "unauthorized");
     if (path === "/auth/login") return { user };
     if (path === "/houses")
@@ -44,52 +43,6 @@ it("signs in with cookies and creates a first house", async () => {
     method: "POST",
     body: JSON.stringify({ email: "a@example.com", password: "password123" }),
   });
-});
-
-it("uses hosted sign-in exclusively when password auth is disabled", async () => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: false, authkit: true };
-    throw new ApiError(401, "unauthorized");
-  });
-  render(<App />);
-  expect(
-    await screen.findByRole("button", { name: "Continue with AuthKit" }),
-  ).toBeInTheDocument();
-  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-});
-
-it("consumes the WorkOS callback only once in StrictMode and clears its URL", async () => {
-  window.history.replaceState(
-    null,
-    "",
-    "/callback?code=one-use-code&state=expected-state",
-  );
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: false, authkit: true };
-    if (path === "/auth/me") return user;
-    return [];
-  });
-  render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
-  await screen.findByLabelText("House name");
-  expect(
-    vi
-      .mocked(api)
-      .mock.calls.filter(([path]) => path === "/auth/workos/callback"),
-  ).toEqual([
-    [
-      "/auth/workos/callback",
-      {
-        method: "POST",
-        body: JSON.stringify({ code: "one-use-code", state: "expected-state" }),
-      },
-    ],
-  ]);
-  expect(window.location.pathname).toBe("/");
-  expect(window.location.search).toBe("");
 });
 
 it("shows a recoverable startup error instead of an empty login screen", async () => {

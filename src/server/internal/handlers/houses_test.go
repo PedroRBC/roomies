@@ -13,7 +13,7 @@ import (
 
 func setupTest(t *testing.T) (http.Handler, *repository.UserRepository, string, func()) {
 	env := newTestEnv(t)
-	return env.Router, env.UserRepo, env.JWTSecret, env.Cleanup
+	return env.Router, env.UserRepo, "", env.Cleanup
 }
 
 func registerUser(t *testing.T, router http.Handler, name, email, password string) string {

@@ -35,42 +35,43 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('sign-in offers Settings instead of a language toggle',
+  testWidgets(
+      'shows email and password immediately and keeps Settings reachable',
       (tester) async {
-    await pumpLogin(
-      tester,
-      MockClient((_) async => http.Response(
-            '{"authkit":true,"password":false}',
-            200,
-          )),
-    );
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('PT'), findsNothing);
+    await pumpLogin(tester, MockClient((_) async => http.Response('{}', 200)));
+    expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
+    expect(find.text('Use email and password'), findsNothing);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('settings'), findsOneWidget);
   });
 
-  testWidgets('server errors read as unreachable and can be retried',
-      (tester) async {
+  testWidgets('validates empty fields before making a request', (tester) async {
     var calls = 0;
-    await pumpLogin(
-      tester,
-      MockClient((_) async {
-        calls++;
-        return calls == 1
-            ? http.Response('', 502)
-            : http.Response('{"authkit":true,"password":false}', 200);
-      }),
-    );
-    expect(find.textContaining("Can't reach Roomies"), findsOneWidget);
-    expect(find.text('502'), findsNothing);
-    // No guessed password form while the sign-in method is unknown.
-    expect(find.text('Use email and password'), findsNothing);
-
-    await tester.tap(find.text('Retry'));
+    await pumpLogin(tester, MockClient((_) async {
+      calls++;
+      return http.Response('{}', 200);
+    }));
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.textContaining("Can't reach Roomies"), findsNothing);
+    expect(find.text('Email is required.'), findsOneWidget);
+    expect(calls, 0);
+  });
+
+  testWidgets('reports a sign-in error without hiding the form',
+      (tester) async {
+    await pumpLogin(
+        tester,
+        MockClient((_) async =>
+            http.Response('{"error":"invalid email or password"}', 401)));
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'alex@example.com');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'password123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('invalid email or password'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
   });
 }

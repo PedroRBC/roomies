@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/houses/accept_invitation_screen.dart';
-import '../features/auth/auth_callback_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/houses/house_screen.dart';
 import '../features/auth/login_screen.dart';
@@ -20,13 +19,12 @@ GoRouter createRouter(AppState appState) {
       final authed = appState.api.isAuthenticated;
       final public = path == '/' ||
           path == '/register' ||
-          path == '/callback' ||
           path == '/accept-invitation' ||
           // Language and appearance are reachable before signing in.
           path == '/settings';
       if (!authed && !public) return '/';
       if (authed && (path == '/' || path == '/register')) {
-        // Fresh AuthKit/password login always goes to Dashboard via explicit
+        // Fresh password login always goes to Dashboard via explicit
         // navigation. Restored sessions prefer the default house when set.
         return appState.restoredHomePath() ?? '/dashboard';
       }
@@ -40,15 +38,6 @@ GoRouter createRouter(AppState appState) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: '/callback',
-        builder: (context, state) => AuthCallbackScreen(
-          code: state.uri.queryParameters['code'],
-          oauthState: state.uri.queryParameters['state'],
-          error: state.uri.queryParameters['error'] ??
-              state.uri.queryParameters['error_description'],
-        ),
       ),
       GoRoute(
         path: '/accept-invitation',

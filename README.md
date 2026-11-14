@@ -3,8 +3,8 @@
 Roomies helps roommates manage shared expenses, notes, balances, and house-scoped household workflows.
 
 - **Apps:** web, Android, Windows, Linux (Flutter); alternative web client (Vite + React, shadcn/ui, Tailwind CSS)
-- **Server:** Go API + worker, PostgreSQL, behind Caddy
-- **Sign-in:** local email/password, or WorkOS AuthKit
+- **Server:** Go API + worker, Better Auth (TypeScript), PostgreSQL, behind Caddy
+- **Sign-in:** email/password through self-hosted Better Auth
 
 You only need Docker (Podman works too); no clone of this repo.
 
@@ -20,13 +20,12 @@ x-backend: &backend
   environment:
     DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD}@db:5432/roomies?sslmode=verify-full&sslrootcert=/tls/ca.crt
     APP_ENV: production
-    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
     ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL:?set ROOMIES_PUBLIC_BASE_URL in .env}
     CORS_ALLOWED_ORIGINS: ${ROOMIES_PUBLIC_BASE_URL}
     TLS_CERT_FILE: /tls/backend.crt
     TLS_KEY_FILE: /tls/backend.key
-    WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
-    WORKOS_API_KEY: ${WORKOS_API_KEY:-}
+    AUTH_URL: https://auth:3000
+    AUTH_CA_FILE: /tls/ca.crt
   volumes:
     - tls:/tls:ro
   depends_on:
@@ -68,10 +67,33 @@ services:
   backend:
     <<: *backend
     command: ["serve"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--no-check-certificate", "-O", "/dev/null", "https://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   worker:
     <<: *backend
     command: ["worker"]
+
+  auth:
+    image: ghcr.io/jobucaldas/roomies-auth:nightly
+    environment:
+      DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD}@db:5432/roomies
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL}
+    volumes:
+      - tls:/tls:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const https=require('https'),fs=require('fs');https.get('https://localhost:3000/api/auth/ok',{ca:fs.readFileSync('/tls/ca.crt')},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
 
   web:
     image: ghcr.io/jobucaldas/roomies-frontend:nightly
@@ -87,7 +109,8 @@ services:
       - caddy:/data
       - tls:/tls:ro
     depends_on:
-      - backend
+      auth:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
@@ -100,11 +123,9 @@ volumes:
 
 ```sh
 POSTGRES_PASSWORD=          # openssl rand -hex 24
-JWT_SECRET=                 # openssl rand -hex 48
+BETTER_AUTH_SECRET=          # openssl rand -hex 48
 ROOMIES_PUBLIC_BASE_URL=https://roomies.example.com   # or http://localhost:8080 to try it
 # SITE_ADDRESS=roomies.example.com                    # see the comment in compose.yaml
-# WORKOS_CLIENT_ID=client_...                         # optional, see below
-# WORKOS_API_KEY=sk_...
 ```
 
 **3. Start it:**
@@ -118,9 +139,11 @@ Open `ROOMIES_PUBLIC_BASE_URL`. With `APP_ENV: production` the server refuses to
 
 Optional backend variables (email invitations, Web Push, FCM) are listed with comments in [`.env.example`](.env.example); add the ones you set to the `x-backend` environment.
 
-**Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the API, and the API and worker reach PostgreSQL, over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
+**Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the API, the API reaches Better Auth, and all server services reach PostgreSQL over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
 
-**WorkOS AuthKit (optional).** Without it, people sign up with email and password. To use hosted sign-in, create a [WorkOS](https://workos.com/docs/authkit) project, set `WORKOS_CLIENT_ID` and `WORKOS_API_KEY`, and register `{ROOMIES_PUBLIC_BASE_URL}/callback` as a redirect URI.
+**Authentication.** [Better Auth](https://better-auth.com) runs in the `auth` container and uses the same PostgreSQL database. Sign up and sign in with email and password; email verification and password recovery are disabled, so SMTP is not required for authentication. Browser sessions use HttpOnly cookies; native apps use bearer tokens. Signing out revokes the session immediately. Set `BETTER_AUTH_SECRET` to a private random value of at least 32 characters.
+
+When upgrading, database migrations preserve existing local users, household memberships, and password hashes. Existing sessions end; sign in again with the same password. Accounts created only through WorkOS have no local password to migrate and cannot sign in until their credentials are imported; keep a backup before upgrading a WorkOS deployment.
 
 ## Apps
 
@@ -136,16 +159,17 @@ Everything runs through Docker Compose; no Go or Flutter install needed. The roo
 docker compose up --build    # optional: cp .env.example .env first
 ```
 
-Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, the Go API and worker (`go run` on the mounted `src/server/`), and `web`, which builds the Flutter web app from `src/app/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
+Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, Better Auth, the Go API and worker (`go run` on the mounted `src/server/`), and `web`, which builds the Flutter web app from `src/app/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
 
 | Changed | Do |
 |---|---|
 | `src/server/` | `docker compose restart backend worker` |
 | `src/app/` | `docker compose up --build -d web` |
+| `src/auth/` | `docker compose up --build -d auth` |
 
 ### Alternative web client
 
-The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy, uses HttpOnly cookie sessions, and supports password or WorkOS sign-in, house creation and switching, shared equal-split expenses, balances, settlement suggestions, and notes. Amounts currently display in USD. Other household features and editing/deletion remain available in Flutter.
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy, uses HttpOnly cookie sessions, and supports email/password sign-in, house creation and switching, shared equal-split expenses, balances, settlement suggestions, and notes. Amounts currently display in USD. Other household features and editing/deletion remain available in Flutter.
 
 Select the alternative on the same origin and port as Flutter (only one can use that port):
 
@@ -161,12 +185,13 @@ docker compose stop web-vite
 docker compose up --build -d web
 ```
 
-The alternative is built locally; the published self-hosting image above continues to serve Flutter. WorkOS uses the same `{ROOMIES_PUBLIC_BASE_URL}/callback` redirect.
+The alternative is built locally; the published self-hosting image above continues to serve Flutter.
 
 Checks and tools:
 
 ```sh
 docker compose run --rm test-backend    # gofmt, vet, tests (SQLite + Postgres)
+docker compose run --build --rm test-auth  # Better Auth type checks and PostgreSQL integration tests
 docker compose run --rm test-frontend   # flutter analyze + test
 docker compose run --build --rm --no-deps test-web  # Vite lint, unit/component tests, production build
 docker compose run --rm apk             # debug APK -> src/app/build/app/outputs/flutter-apk/
@@ -176,6 +201,7 @@ Windows and Linux builds need their own OS: `flutter build windows|linux --relea
 
 | Path | Role |
 |---|---|
+| `src/auth/` | Better Auth service; `Dockerfile` builds its runtime and test tooling |
 | `src/server/` | Go API and worker. `Dockerfile`: `dev` stage (toolchain used by compose) and the production image |
 | `src/app/` | Flutter app. `Dockerfile`: `local` builds the web bundle from source, `prebuilt` (default, what CI publishes) copies `build/web`; both serve it with Caddy and proxy `/api/*` (`SITE_ADDRESS`, `BACKEND_UPSTREAM`) |
 | `src/web/` | Alternative Vite + React web client; shadcn/ui components, Tailwind CSS v4. `web-vite` serves it through Caddy; `test-web` runs its checks |

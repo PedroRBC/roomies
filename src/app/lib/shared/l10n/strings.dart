@@ -42,13 +42,32 @@ class RoomiesStrings {
       _t('Private by default', 'Privado por padrão', 'Privado por defecto');
 
   String get signIn => _t('Sign in', 'Entrar', 'Iniciar sesión');
-  String get redirecting =>
-      _t('Redirecting…', 'Redirecionando…', 'Redirigiendo…');
   String get createAccount =>
       _t('Create account', 'Criar conta', 'Crear cuenta');
-  String get useEmailPassword => _t('Use email and password',
-      'Usar email e senha', 'Usar correo y contraseña');
-  String get hideEmailPassword => _t('Hide', 'Ocultar', 'Ocultar');
+  String get welcomeHome =>
+      _t('Welcome home', 'Bem-vindo à sua casa', 'Bienvenido a casa');
+  String get makeYourselfAtHome =>
+      _t('Make yourself at home', 'Sinta-se em casa', 'Siéntete como en casa');
+  String get loginDescription => _t(
+      'Sign in to your shared expenses, notes, and household.',
+      'Entre para ver as despesas, notas e tarefas da casa.',
+      'Entra para ver los gastos, notas y tareas de la casa.');
+  String get registerDescription => _t(
+      'Create your account, then join your roommates or start a house.',
+      'Crie sua conta e entre na casa dos seus colegas ou crie uma casa.',
+      'Crea tu cuenta y únete a tus compañeros o crea una casa.');
+  String get newAccount => _t('New to Roomies? Create an account',
+      'Novo no Roomies? Criar conta', '¿Nuevo en Roomies? Crea una cuenta');
+  String get showPassword =>
+      _t('Show password', 'Mostrar senha', 'Mostrar contraseña');
+  String get hidePassword =>
+      _t('Hide password', 'Ocultar senha', 'Ocultar contraseña');
+  String get passwordLength => _t('Use between 8 and 128 characters.',
+      'Use entre 8 e 128 caracteres.', 'Usa entre 8 y 128 caracteres.');
+  String get nameRequired => _t(
+      'Name is required.', 'Nome é obrigatório.', 'El nombre es obligatorio.');
+  String get invalidEmail => _t('Enter a valid email.',
+      'Informe um email válido.', 'Introduce un correo válido.');
   String get login => signIn;
   String get loggingIn => _t('Signing in…', 'Entrando…', 'Iniciando sesión…');
   String get register => createAccount;
@@ -370,8 +389,7 @@ class RoomiesStrings {
   String get copyLink => _t('Copy link', 'Copiar link', 'Copiar enlace');
   String get linkCopied =>
       _t('Link copied.', 'Link copiado.', 'Enlace copiado.');
-  String get revokeInvitation =>
-      _t('Revoke', 'Revogar', 'Revocar');
+  String get revokeInvitation => _t('Revoke', 'Revogar', 'Revocar');
   String get changeRole => _t('Change role', 'Alterar papel', 'Cambiar rol');
   String get remove => _t('Remove', 'Remover', 'Quitar');
   String get memberRemoved =>

@@ -19,38 +19,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Auth } from "@/components/auth";
-import type { AuthConfig } from "@/components/auth";
 import { Field } from "@/components/field";
 import { HouseWorkspace } from "@/components/house-workspace";
-import { api, ApiError, workosUrl } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { House, User } from "@/lib/api";
 
 async function bootstrap() {
-  const config = await api<AuthConfig>("/auth/config");
-  const params = new URLSearchParams(window.location.search);
-  if (window.location.pathname === "/callback") {
-    const code = params.get("code"),
-      state = params.get("state");
-    // Remove one-use authorization codes before making any further requests.
-    window.history.replaceState(null, "", "/");
-    if (!code || !state)
-      throw new Error("Sign-in was not completed. Please try again.");
-    await api("/auth/workos/callback", {
-      method: "POST",
-      body: JSON.stringify({ code, state }),
-    });
-  }
   let user: User | null = null;
   try {
     user = await api<User>("/auth/me");
   } catch (err) {
     if (!(err instanceof ApiError) || err.status !== 401) throw err;
   }
-  return { config, user };
+  return { user };
 }
 
 export default function App() {
-  const [config, setConfig] = useState<AuthConfig | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [houses, setHouses] = useState<House[]>([]);
   const [selected, setSelected] = useState("");
@@ -71,7 +55,6 @@ export default function App() {
     startup.current
       .then((result) => {
         if (active) {
-          setConfig(result.config);
           setUser(result.user);
           setHouseLoading(!!result.user);
         }
@@ -161,15 +144,8 @@ export default function App() {
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
-                    const result = await api<{ logout_url?: string }>(
-                      "/auth/logout",
-                      { method: "POST" },
-                    );
+                    await api("/auth/logout", { method: "POST" });
                     onUnauthorized();
-                    if (result?.logout_url)
-                      window.location.assign(
-                        workosUrl(result.logout_url, "logout"),
-                      );
                   })
                 }
               >
@@ -199,15 +175,12 @@ export default function App() {
         {loading ? (
           <p role="status">Opening Roomies…</p>
         ) : !user ? (
-          config && (
+          (
             <Auth
-              config={config}
               onLogin={(user) => {
                 setHouseLoading(true);
                 setUser(user);
               }}
-              run={run}
-              busy={busy}
             />
           )
         ) : (

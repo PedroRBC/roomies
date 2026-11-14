@@ -11,8 +11,6 @@ import (
 	"strings"
 )
 
-const developmentJWTSecret = "dev-secret-change-in-production"
-
 // SMTP transport security modes for SMTP_TLS.
 const (
 	SMTPTLSStartTLS = "starttls" // plain connection upgraded with STARTTLS; refuses servers without it
@@ -24,7 +22,6 @@ type Config struct {
 	Port                        string
 	WorkerHealthPort            string
 	DatabaseURL                 string
-	JWTSecret                   string
 	Environment                 string
 	CORSAllowedOrigins          []string
 	PublicBaseURL               string
@@ -50,10 +47,8 @@ type Config struct {
 	WebPushSubject              string
 	FCMProjectID                string
 	FCMCredentialsFile          string
-	WorkOSAPIKey                string
-	WorkOSClientID              string
-	WorkOSRedirectURI           string
-	JWTAccessTTLHours           int
+	AuthURL                     string
+	AuthCAFile                  string
 }
 
 func Load() *Config {
@@ -61,7 +56,6 @@ func Load() *Config {
 		Port:                        getEnv("PORT", "8080"),
 		WorkerHealthPort:            getEnv("WORKER_HEALTH_PORT", "8081"),
 		DatabaseURL:                 getEnv("DATABASE_URL", "sqlite://roomies.db"),
-		JWTSecret:                   getEnv("JWT_SECRET", developmentJWTSecret),
 		Environment:                 strings.ToLower(getEnv("APP_ENV", "development")),
 		CORSAllowedOrigins:          splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:8081")),
 		PublicBaseURL:               strings.TrimRight(getEnv("ROOMIES_PUBLIC_BASE_URL", "http://localhost:8080"), "/"),
@@ -87,39 +81,19 @@ func Load() *Config {
 		WebPushSubject:              getEnv("WEB_PUSH_SUBJECT", "mailto:no-reply@roomies.local"),
 		FCMProjectID:                strings.TrimSpace(os.Getenv("FCM_PROJECT_ID")),
 		FCMCredentialsFile:          strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")),
-		WorkOSAPIKey:                strings.TrimSpace(os.Getenv("WORKOS_API_KEY")),
-		WorkOSClientID:              strings.TrimSpace(os.Getenv("WORKOS_CLIENT_ID")),
-		WorkOSRedirectURI:           strings.TrimSpace(os.Getenv("WORKOS_REDIRECT_URI")),
-		JWTAccessTTLHours:           getEnvInt("JWT_ACCESS_TTL_HOURS", 8),
+		AuthURL:                     getEnv("AUTH_URL", "https://auth:3000"),
+		AuthCAFile:                  strings.TrimSpace(os.Getenv("AUTH_CA_FILE")),
 	}
-}
-
-// WorkOSRedirect returns the AuthKit callback URL. Defaults to {PublicBaseURL}/callback.
-func (c *Config) WorkOSRedirect() string {
-	if c.WorkOSRedirectURI != "" {
-		return c.WorkOSRedirectURI
-	}
-	if c.PublicBaseURL == "" {
-		return ""
-	}
-	return strings.TrimRight(c.PublicBaseURL, "/") + "/callback"
-}
-
-// WorkOSEnabled is true when AuthKit API credentials are present.
-func (c *Config) WorkOSEnabled() bool {
-	return c.WorkOSAPIKey != "" && c.WorkOSClientID != "" && c.WorkOSRedirect() != ""
 }
 
 func (c *Config) Validate() error {
-	// The built-in development secret is public (it is in the source), so it
-	// may only sign sessions for a deployment reachable on loopback.
-	if c.JWTSecret == developmentJWTSecret && !isLoopbackURL(c.PublicBaseURL) {
-		return errors.New("JWT_SECRET must be set unless ROOMIES_PUBLIC_BASE_URL is a localhost URL")
+	if c.AuthURL != "" {
+		u, err := url.Parse(c.AuthURL)
+		if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Hostname()))) {
+			return errors.New("AUTH_URL must use https except on localhost and contain only an origin")
+		}
 	}
 	if c.Environment == "production" {
-		if c.JWTSecret == developmentJWTSecret || len(c.JWTSecret) < 32 {
-			return errors.New("production JWT_SECRET must be set to at least 32 characters")
-		}
 		for _, origin := range c.CORSAllowedOrigins {
 			if origin == "*" {
 				return errors.New("wildcard CORS origin is not allowed in production")
@@ -136,15 +110,6 @@ func (c *Config) Validate() error {
 	}
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
 		return errors.New("TLS_CERT_FILE and TLS_KEY_FILE must be provided together")
-	}
-	if (c.WorkOSAPIKey == "") != (c.WorkOSClientID == "") {
-		return errors.New("WORKOS_API_KEY and WORKOS_CLIENT_ID must be provided together")
-	}
-	if c.WorkOSRedirectURI != "" {
-		redirectURL, err := url.Parse(c.WorkOSRedirectURI)
-		if err != nil || (redirectURL.Scheme != "http" && redirectURL.Scheme != "https") || redirectURL.Host == "" {
-			return errors.New("WORKOS_REDIRECT_URI must be an absolute http(s) URL")
-		}
 	}
 	if len(c.CORSAllowedOrigins) == 0 {
 		return errors.New("at least one CORS_ALLOWED_ORIGINS value is required")
@@ -164,9 +129,6 @@ func (c *Config) Validate() error {
 	}
 	if c.InvitationTTL <= 0 {
 		return errors.New("INVITATION_TTL_HOURS must be positive")
-	}
-	if c.JWTAccessTTLHours <= 0 {
-		return errors.New("JWT_ACCESS_TTL_HOURS must be positive")
 	}
 	if c.JobPollInterval <= 0 {
 		return errors.New("JOB_POLL_INTERVAL_SECONDS must be positive")
