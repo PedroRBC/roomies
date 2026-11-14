@@ -12,12 +12,13 @@ func NewID() string {
 }
 
 type User struct {
-	ID           string    `db:"id" json:"id"`
-	Name         string    `db:"name" json:"name"`
-	Email        string    `db:"email" json:"email"`
-	PasswordHash string    `db:"password_hash" json:"-"`
-	WorkOSUserID string    `db:"workos_user_id" json:"-"`
-	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+	TwoFactorEnabled bool      `db:"two_factor_enabled" json:"two_factor_enabled"`
+	ID               string    `db:"id" json:"id"`
+	Name             string    `db:"name" json:"name"`
+	Email            string    `db:"email" json:"email"`
+	PasswordHash     string    `db:"password_hash" json:"-"`
+	WorkOSUserID     string    `db:"workos_user_id" json:"-"`
+	CreatedAt        time.Time `db:"created_at" json:"created_at"`
 }
 
 type House struct {

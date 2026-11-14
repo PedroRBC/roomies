@@ -2,11 +2,16 @@ package handlers_test
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"github.com/roomies/backend/internal/betterauth"
+	"github.com/roomies/backend/internal/models"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,7 +36,7 @@ type testEnv struct {
 	ReliabilityRepo  *repository.ReliabilityRepository
 	NotificationRepo *repository.NotificationRepository
 	HouseholdRepo    *repository.HouseholdRepository
-	JWTSecret        string
+	Authority        *betterauth.Client
 	Cleanup          func()
 }
 
@@ -53,12 +58,10 @@ func newTestEnv(t *testing.T) *testEnv {
 		Port:               "8080",
 		WorkerHealthPort:   "8081",
 		DatabaseURL:        databaseURL,
-		JWTSecret:          "test-secret-used-for-jwt-signing",
 		Environment:        "test",
 		CORSAllowedOrigins: []string{"http://localhost:8081"},
 		PublicBaseURL:      "https://roomies.test",
 		InvitationTTL:      168,
-		JWTAccessTTLHours:  8,
 		JobPollInterval:    1,
 		JobLeaseSeconds:    30,
 	}
@@ -75,8 +78,10 @@ func newTestEnv(t *testing.T) *testEnv {
 	reliabilityRepo := repository.NewReliabilityRepository(db, clk)
 	householdRepo := repository.NewHouseholdRepository(db, clk)
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	authority := newAuthFixture(t, userRepo)
 	router := server.NewHandler(server.Dependencies{
 		Config:           cfg,
+		Auth:             authority,
 		Logger:           logger,
 		Clock:            clk,
 		UserRepo:         userRepo,
@@ -99,7 +104,78 @@ func newTestEnv(t *testing.T) *testEnv {
 		ReliabilityRepo:  reliabilityRepo,
 		NotificationRepo: notificationRepo,
 		HouseholdRepo:    householdRepo,
-		JWTSecret:        cfg.JWTSecret,
+		Authority:        authority,
 		Cleanup:          func() { _ = db.Close() },
 	}
+}
+
+// Domain handler tests use a fake authority; src/auth tests exercise real Better Auth.
+func newAuthFixture(t *testing.T, users *repository.UserRepository) *betterauth.Client {
+	t.Helper()
+	var mu sync.Mutex
+	sessions := map[string]string{}
+	passwords := map[string]string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if token == "" {
+			if cookie, err := r.Cookie("roomies_session"); err == nil {
+				token = cookie.Value
+			}
+		}
+		switch r.URL.Path {
+		case "/api/auth/get-session":
+			id, ok := sessions[token]
+			if !ok {
+				json.NewEncoder(w).Encode(nil)
+				return
+			}
+			user, err := users.GetByID(r.Context(), id)
+			if err != nil {
+				json.NewEncoder(w).Encode(nil)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"user": user, "session": map[string]string{"id": token}})
+		case "/api/auth/sign-out":
+			delete(sessions, token)
+			http.SetCookie(w, &http.Cookie{Name: "roomies_session", Value: "", MaxAge: -1, Path: "/", HttpOnly: true, Secure: true})
+			json.NewEncoder(w).Encode(map[string]bool{"success": true})
+		case "/api/auth/sign-up/email", "/api/auth/sign-in/email":
+			var req models.RegisterRequest
+			json.NewDecoder(r.Body).Decode(&req)
+			var user *models.User
+			if r.URL.Path == "/api/auth/sign-up/email" {
+				user = &models.User{ID: models.NewID(), Name: req.Name, Email: req.Email, CreatedAt: time.Now()}
+				if err := users.Create(r.Context(), user); err != nil {
+					w.WriteHeader(422)
+					json.NewEncoder(w).Encode(map[string]string{"message": "already registered"})
+					return
+				}
+				passwords[user.ID] = req.Password
+			} else {
+				var err error
+				user, err = users.GetByEmail(r.Context(), req.Email)
+				if err != nil || passwords[user.ID] != req.Password {
+					w.WriteHeader(401)
+					json.NewEncoder(w).Encode(map[string]string{"message": "invalid credentials"})
+					return
+				}
+			}
+			token = models.NewID()
+			sessions[token] = user.ID
+			http.SetCookie(w, &http.Cookie{Name: "roomies_session", Value: token, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+			w.Header().Set("set-auth-token", token)
+			json.NewEncoder(w).Encode(models.AuthResponse{Token: token, User: *user})
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	client, err := betterauth.NewClient(srv.URL, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
 }

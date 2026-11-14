@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/roomies/backend/internal/betterauth"
 	roomiesclock "github.com/roomies/backend/internal/clock"
 	"github.com/roomies/backend/internal/config"
 	"github.com/roomies/backend/internal/database"
@@ -94,7 +95,12 @@ func runServer(ctx context.Context, logger *slog.Logger, cfg *config.Config, clk
 	reliabilityRepo *repository.ReliabilityRepository, notificationRepo *repository.NotificationRepository,
 	householdRepo *repository.HouseholdRepository,
 ) error {
+	authClient, err := betterauth.NewClient(cfg.AuthURL, cfg.AuthCAFile)
+	if err != nil {
+		return fmt.Errorf("configure authentication: %w", err)
+	}
 	handler := server.NewHandler(server.Dependencies{
+		Auth:             authClient,
 		Config:           cfg,
 		Logger:           logger,
 		Clock:            clk,
@@ -216,7 +222,7 @@ func runTLSInit(logger *slog.Logger, args []string) error {
 	flags := flag.NewFlagSet("tls-init", flag.ContinueOnError)
 	dir := flags.String("dir", "/tls", "directory for the CA, certificates, keys, and pg_hba.conf")
 	dbHosts := flags.String("db-hosts", "db", "comma-separated names the PostgreSQL certificate is valid for")
-	backendHosts := flags.String("backend-hosts", "backend,localhost,127.0.0.1", "comma-separated names the API certificate is valid for")
+	backendHosts := flags.String("backend-hosts", "backend,auth,localhost,127.0.0.1", "comma-separated names the API certificate is valid for")
 	dbGroup := flags.Int("db-group", 70, "group id of the PostgreSQL server (70 in postgres:*-alpine, 999 in Debian images)")
 	backendUser := flags.Int("backend-user", 10001, "uid that runs the API")
 	if err := flags.Parse(args); err != nil {

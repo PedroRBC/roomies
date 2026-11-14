@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/roomies/backend/internal/middleware"
@@ -498,4 +499,35 @@ func (h *HouseholdHandler) DeleteChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(204)
+}
+
+// ListHouseCompletions accepts a UTC calendar range with an exclusive end.
+func (h *HouseholdHandler) ListHouseCompletions(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.member(w, r); !ok {
+		return
+	}
+	from, fromErr := time.Parse("2006-01-02", r.URL.Query().Get("from"))
+	to, toErr := time.Parse("2006-01-02", r.URL.Query().Get("to"))
+	if fromErr != nil || toErr != nil || !from.Before(to) || to.Sub(from) > 366*24*time.Hour {
+		writeJSON(w, 400, models.ErrorResponse{Error: "from and to must be YYYY-MM-DD with 0 < range <= 366 days (to is exclusive, UTC)"})
+		return
+	}
+	rows, err := h.repo.ListHouseCompletions(r.Context(), chi.URLParam(r, "id"), from, to)
+	if err != nil {
+		writeJSON(w, 500, models.ErrorResponse{Error: "failed to list completions"})
+		return
+	}
+	writeJSON(w, 200, rows)
+}
+
+func (h *HouseholdHandler) Agenda(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.member(w, r); !ok {
+		return
+	}
+	agenda, err := h.repo.Agenda(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, 500, models.ErrorResponse{Error: "failed to load agenda"})
+		return
+	}
+	writeJSON(w, 200, agenda)
 }

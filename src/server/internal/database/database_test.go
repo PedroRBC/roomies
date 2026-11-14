@@ -229,6 +229,8 @@ func assertCurrentPostgresMigrationState(t *testing.T, db *sqlx.DB, legacyName s
 		{8, "household_domains"},
 		{9, "workos_authkit_users"},
 		{10, "revoked_sessions"},
+		{11, "better_auth"},
+		{12, "auth_two_factor"},
 	}
 	if len(ledger) != len(expected) {
 		t.Fatalf("unexpected migration ledger: %#v", ledger)
@@ -390,6 +392,8 @@ func TestSQLiteMigrationsUpgradeLegacySchema(t *testing.T) {
 		"household_domains",
 		"workos_authkit_users",
 		"revoked_sessions",
+		"better_auth",
+		"auth_two_factor",
 	}
 	if len(names) != len(wantNames) {
 		t.Fatalf("unexpected migration ledger names: %#v", names)
@@ -507,5 +511,44 @@ func TestSQLiteReliabilityTablesAreCreated(t *testing.T) {
 		if count != 1 {
 			t.Fatalf("expected table %s to exist", table)
 		}
+	}
+}
+
+func TestBetterAuthMigrationPreservesLocalCredentials(t *testing.T) {
+	db, err := Connect("sqlite://:memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, workos_user_id TEXT);
+ INSERT INTO users(id,name,email,password_hash) VALUES('local','Local','local@example.test','$2a$10$legacy');
+ INSERT INTO users(id,name,email,password_hash,workos_user_id) VALUES('hosted','Hosted','hosted@example.test','','workos-1');`); err != nil {
+		t.Fatal(err)
+	}
+	var migration schemaMigration
+	for _, m := range migrations("sqlite3") {
+		if m.version == 11 {
+			migration = m
+		}
+	}
+	if migration.up == nil {
+		t.Fatal("missing Better Auth migration")
+	}
+	if err := migration.up(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	var hash string
+	if err := db.Get(&hash, `SELECT password FROM auth_account WHERE "userId" = 'local' AND "providerId" = 'credential' AND "accountId" = 'local'`); err != nil {
+		t.Fatal(err)
+	}
+	if hash != "$2a$10$legacy" {
+		t.Fatalf("password hash changed: %q", hash)
+	}
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM users WHERE id IN ('local','hosted')`); err != nil || count != 2 {
+		t.Fatalf("users lost: %d %v", count, err)
+	}
+	if err := db.Get(&count, `SELECT COUNT(*) FROM auth_account WHERE "userId" = 'hosted'`); err != nil || count != 0 {
+		t.Fatalf("must not invent a password for WorkOS users: %d %v", count, err)
 	}
 }

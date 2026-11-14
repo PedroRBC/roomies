@@ -58,7 +58,7 @@ void main() {
     expect(es, isNot(equals(pt)));
   });
 
-  test('Portuguese strings cover hosted AuthKit CTA', () {
+  test('Portuguese strings cover sign-in and settings', () {
     final pt = RoomiesStrings('pt');
     expect(pt.signIn, 'Entrar');
     expect(pt.createAccount, 'Criar conta');

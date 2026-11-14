@@ -4,14 +4,17 @@ class User {
     required this.name,
     required this.email,
     required this.createdAt,
+    this.twoFactorEnabled = false,
   });
 
+  final bool twoFactorEnabled;
   final String id;
   final String name;
   final String email;
   final String createdAt;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
+        twoFactorEnabled: json['two_factor_enabled'] as bool? ?? false,
         id: json['id'] as String,
         name: json['name'] as String,
         email: json['email'] as String,
@@ -248,24 +251,6 @@ class AuthResponse {
   factory AuthResponse.fromJson(Map<String, dynamic> json) => AuthResponse(
         token: json['token'] as String? ?? '',
         user: User.fromJson(json['user'] as Map<String, dynamic>),
-      );
-}
-
-class AuthConfig {
-  AuthConfig({
-    required this.authkit,
-    required this.password,
-    this.redirectUri = '',
-  });
-
-  final bool authkit;
-  final bool password;
-  final String redirectUri;
-
-  factory AuthConfig.fromJson(Map<String, dynamic> json) => AuthConfig(
-        authkit: json['authkit'] as bool? ?? false,
-        password: json['password'] as bool? ?? true,
-        redirectUri: json['redirect_uri'] as String? ?? '',
       );
 }
 

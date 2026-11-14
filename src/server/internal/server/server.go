@@ -9,15 +9,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/roomies/backend/internal/betterauth"
 	roomiesclock "github.com/roomies/backend/internal/clock"
 	"github.com/roomies/backend/internal/config"
 	"github.com/roomies/backend/internal/handlers"
 	"github.com/roomies/backend/internal/middleware"
 	"github.com/roomies/backend/internal/repository"
-	"github.com/roomies/backend/internal/workosauth"
 )
 
 type Dependencies struct {
+	Auth             *betterauth.Client
 	Config           *config.Config
 	Logger           *slog.Logger
 	Clock            roomiesclock.Clock
@@ -45,14 +46,7 @@ func NewHandler(deps Dependencies) http.Handler {
 		isReady = func() bool { return true }
 	}
 
-	workosClient := &workosauth.Client{
-		APIKey:      deps.Config.WorkOSAPIKey,
-		ClientID:    deps.Config.WorkOSClientID,
-		RedirectURI: deps.Config.WorkOSRedirect(),
-	}
-	authHandler := handlers.NewAuthHandler(deps.UserRepo, deps.Config.JWTSecret, workosClient)
-	authHandler.SetPublicBaseURL(deps.Config.PublicBaseURL)
-	authHandler.SetSessionTTL(time.Duration(deps.Config.JWTAccessTTLHours) * time.Hour)
+	authHandler := handlers.NewAuthHandler(deps.UserRepo, deps.Auth, deps.Config.PublicBaseURL)
 	houseHandler := handlers.NewHouseHandler(deps.HouseRepo, deps.UserRepo, deps.ReliabilityRepo)
 	expenseHandler := handlers.NewExpenseHandler(deps.ExpenseRepo, deps.HouseRepo)
 	noteHandler := handlers.NewNoteHandler(deps.NoteRepo, deps.HouseRepo)
@@ -109,15 +103,21 @@ func NewHandler(deps Dependencies) http.Handler {
 
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Get("/config", authHandler.Config)
-		r.Get("/workos/authorize", authHandler.WorkOSAuthorize)
-		r.Post("/workos/callback", authHandler.WorkOSCallback)
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
 		r.Post("/logout", authHandler.Logout)
+		r.Post("/two-factor/{action}", authHandler.TwoFactor)
+		r.Post("/google", authHandler.Google)
+		r.Get("/google", authHandler.Google)
+		r.Get("/callback/google", authHandler.GoogleCallback)
+		r.Get("/google/finish", authHandler.GoogleFinish)
+		r.Post("/google/finish", authHandler.GoogleFinish)
+		r.Post("/native/start", authHandler.NativeStart)
+		r.Post("/native/poll", authHandler.NativePoll)
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.JWTAuth(deps.Config.JWTSecret, deps.UserRepo))
+		r.Use(middleware.SessionAuth(deps.Auth))
 		r.Use(middleware.Idempotency(deps.ReliabilityRepo))
 
 		r.Get("/api/auth/me", authHandler.Me)
@@ -131,6 +131,8 @@ func NewHandler(deps Dependencies) http.Handler {
 				r.Get("/", houseHandler.Get)
 				r.Put("/", houseHandler.Update)
 				r.Get("/events", eventsHandler.List)
+				r.Get("/chore-completions", householdHandler.ListHouseCompletions)
+				r.Get("/agenda", householdHandler.Agenda)
 				r.Get("/notification-preferences", notificationHandler.GetPreferences)
 				r.Put("/notification-preferences", notificationHandler.PutPreferences)
 				r.Route("/notification-subscriptions", func(r chi.Router) {

@@ -7,6 +7,61 @@ class RoomiesStrings {
   static const supported = <String>['en', 'pt', 'es'];
 
   final String localeCode;
+  String get factorRecentLogin => _t(
+      'Optional if you signed in within the last 5 minutes.',
+      'Opcional se você entrou nos últimos 5 minutos.',
+      'Opcional si iniciaste sesión en los últimos 5 minutos.');
+  String get accountSecurity =>
+      _t('Account security', 'Segurança da conta', 'Seguridad de la cuenta');
+  String get authenticator => _t('Authenticator app', 'Aplicativo autenticador',
+      'Aplicación autenticadora');
+  String get factorDescription => _t(
+      'Use an app such as Google Authenticator, 1Password or Aegis.',
+      'Use um app como Google Authenticator, 1Password ou Aegis.',
+      'Usa una app como Google Authenticator, 1Password o Aegis.');
+  String get factorEnabled => _t(
+      'Two-factor authentication is enabled.',
+      'Autenticação de dois fatores ativada.',
+      'Autenticación de dos factores activada.');
+  String get factorCode => _t('Authenticator code', 'Código do autenticador',
+      'Código del autenticador');
+  String get recoveryCode =>
+      _t('Recovery code', 'Código de recuperação', 'Código de recuperación');
+  String get useRecovery => _t('Use a recovery code',
+      'Usar código de recuperação', 'Usar código de recuperación');
+  String get useAuthenticator => _t('Use authenticator app',
+      'Usar aplicativo autenticador', 'Usar aplicación autenticadora');
+  String get setupAuthenticator => _t('Set up authenticator',
+      'Configurar autenticador', 'Configurar autenticador');
+  String get confirmAuthenticator => _t('Confirm authenticator',
+      'Confirmar autenticador', 'Confirmar autenticador');
+  String get disableFactor => _t(
+      'Disable two-factor authentication',
+      'Desativar autenticação de dois fatores',
+      'Desactivar autenticación de dos factores');
+  String get scanAuthenticator => _t(
+      'Scan this QR code with your authenticator app, or enter the key below.',
+      'Escaneie este QR code no autenticador ou digite a chave abaixo.',
+      'Escanea este código QR con tu autenticador o introduce la clave.');
+  String get saveRecovery => _t(
+      'Save these recovery codes somewhere safe. Each can be used once if you lose your authenticator.',
+      'Guarde estes códigos em um local seguro. Cada um pode ser usado uma vez se perder o autenticador.',
+      'Guarda estos códigos en un lugar seguro. Cada uno se puede usar una vez si pierdes el autenticador.');
+  String get recoverySaved => _t(
+      'I saved my recovery codes',
+      'Guardei meus códigos de recuperação',
+      'Guardé mis códigos de recuperación');
+  String get factorPassword => _t(
+      'Current password (leave blank for Google-only accounts)',
+      'Senha atual (deixe em branco se usa apenas Google)',
+      'Contraseña actual (deja en blanco si solo usas Google)');
+  String get verifyCode => _t('Verify', 'Verificar', 'Verificar');
+  String get googleSignIn => _t(
+      'Continue with Google', 'Continuar com Google', 'Continuar con Google');
+  String get googleWaiting => _t(
+      'Finish sign-in in your browser, then return to Roomies.',
+      'Conclua a entrada no navegador e volte ao Roomies.',
+      'Completa el inicio de sesión en el navegador y vuelve a Roomies.');
 
   bool get isPortuguese => localeCode == 'pt';
   bool get isSpanish => localeCode == 'es';
@@ -42,13 +97,32 @@ class RoomiesStrings {
       _t('Private by default', 'Privado por padrão', 'Privado por defecto');
 
   String get signIn => _t('Sign in', 'Entrar', 'Iniciar sesión');
-  String get redirecting =>
-      _t('Redirecting…', 'Redirecionando…', 'Redirigiendo…');
   String get createAccount =>
       _t('Create account', 'Criar conta', 'Crear cuenta');
-  String get useEmailPassword => _t('Use email and password',
-      'Usar email e senha', 'Usar correo y contraseña');
-  String get hideEmailPassword => _t('Hide', 'Ocultar', 'Ocultar');
+  String get welcomeHome =>
+      _t('Welcome home', 'Bem-vindo à sua casa', 'Bienvenido a casa');
+  String get makeYourselfAtHome =>
+      _t('Make yourself at home', 'Sinta-se em casa', 'Siéntete como en casa');
+  String get loginDescription => _t(
+      'Sign in to your shared expenses, notes, and household.',
+      'Entre para ver as despesas, notas e tarefas da casa.',
+      'Entra para ver los gastos, notas y tareas de la casa.');
+  String get registerDescription => _t(
+      'Create your account, then join your roommates or start a house.',
+      'Crie sua conta e entre na casa dos seus colegas ou crie uma casa.',
+      'Crea tu cuenta y únete a tus compañeros o crea una casa.');
+  String get newAccount => _t('New to Roomies? Create an account',
+      'Novo no Roomies? Criar conta', '¿Nuevo en Roomies? Crea una cuenta');
+  String get showPassword =>
+      _t('Show password', 'Mostrar senha', 'Mostrar contraseña');
+  String get hidePassword =>
+      _t('Hide password', 'Ocultar senha', 'Ocultar contraseña');
+  String get passwordLength => _t('Use between 8 and 128 characters.',
+      'Use entre 8 e 128 caracteres.', 'Usa entre 8 y 128 caracteres.');
+  String get nameRequired => _t(
+      'Name is required.', 'Nome é obrigatório.', 'El nombre es obligatorio.');
+  String get invalidEmail => _t('Enter a valid email.',
+      'Informe um email válido.', 'Introduce un correo válido.');
   String get login => signIn;
   String get loggingIn => _t('Signing in…', 'Entrando…', 'Iniciando sesión…');
   String get register => createAccount;
@@ -370,8 +444,7 @@ class RoomiesStrings {
   String get copyLink => _t('Copy link', 'Copiar link', 'Copiar enlace');
   String get linkCopied =>
       _t('Link copied.', 'Link copiado.', 'Enlace copiado.');
-  String get revokeInvitation =>
-      _t('Revoke', 'Revogar', 'Revocar');
+  String get revokeInvitation => _t('Revoke', 'Revogar', 'Revocar');
   String get changeRole => _t('Change role', 'Alterar papel', 'Cambiar rol');
   String get remove => _t('Remove', 'Remover', 'Quitar');
   String get memberRemoved =>

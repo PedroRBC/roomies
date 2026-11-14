@@ -8,9 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/roomies/backend/internal/handlers"
 	"github.com/roomies/backend/internal/models"
 )
@@ -62,20 +60,12 @@ func TestLogoutRevokesTheSessionToken(t *testing.T) {
 	}
 }
 
-func TestSessionTokensWithoutIDOrExpiryAreRejected(t *testing.T) {
+func TestForgedSessionIsRejected(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Cleanup()
-	userID := getUserID(t, env.Router, registerUser(t, env.Router, "Claims", "claims@test.com", "password123"))
-	for name, claims := range map[string]jwt.MapClaims{
-		"no jti":    {"user_id": userID, "exp": time.Now().Add(time.Hour).Unix()},
-		"no expiry": {"user_id": userID, "jti": "abc"},
-	} {
-		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(env.JWTSecret))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if response := authenticatedRequest(t, env.Router, http.MethodGet, "/api/auth/me", token, nil); response.Code != http.StatusUnauthorized {
-			t.Fatalf("%s: expected 401, got %d", name, response.Code)
+	for _, token := range []string{"forged", "e30.e30.forged"} {
+		if res := authenticatedRequest(t, env.Router, http.MethodGet, "/api/auth/me", token, nil); res.Code != 401 {
+			t.Fatalf("forged session accepted: %d", res.Code)
 		}
 	}
 }
@@ -83,8 +73,7 @@ func TestSessionTokensWithoutIDOrExpiryAreRejected(t *testing.T) {
 func TestLoginIsRateLimitedPerAccount(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Cleanup()
-	handler := handlers.NewAuthHandler(env.UserRepo, env.JWTSecret, nil)
-	handler.SetRateLimit(1000)
+	handler := handlers.NewAuthHandler(env.UserRepo, env.Authority, env.Config.PublicBaseURL)
 	status := 0
 	for attempt := 0; attempt < 11; attempt++ {
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader([]byte(`{"email":"Target@Example.test","password":"guess"}`)))

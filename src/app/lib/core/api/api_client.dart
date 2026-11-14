@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../auth/workos_url.dart';
 import '../models/models.dart';
 import '../storage/session_hint_stub.dart'
     if (dart.library.js_interop) '../storage/session_hint_web.dart'
@@ -76,7 +75,10 @@ void requireEncryptedApiBase(String baseUrl,
   throw StateError('ROOMIES_API_URL must use https:// (got $baseUrl)');
 }
 
+class TwoFactorRequired implements Exception {}
+
 class ApiClient {
+  String? _twoFactorChallenge;
   ApiClient({
     SessionStorage? storage,
     http.Client? httpClient,
@@ -105,7 +107,7 @@ class ApiClient {
 
   bool get isAuthenticated => _valid && (_cookieSession || hasSavedToken);
 
-  /// Web sessions live in an HttpOnly cookie. Drop any JWT left in
+  /// Web sessions live in an HttpOnly cookie. Drop any token left in
   /// localStorage by older builds so page script cannot read it.
   Future<void> clearLegacyWebSession() async {
     if (!kIsWeb) return;
@@ -123,6 +125,7 @@ class ApiClient {
   }
 
   void adoptCookieSession() {
+    _twoFactorChallenge = null;
     _generation++;
     _token = null;
     _cookieSession = true;
@@ -130,6 +133,7 @@ class ApiClient {
   }
 
   Future<void> _setToken(String token) async {
+    _twoFactorChallenge = null;
     if (kIsWeb || token.isEmpty) {
       adoptCookieSession();
       return;
@@ -145,29 +149,20 @@ class ApiClient {
     _valid = false;
   }
 
-  /// Clears the session. Returns the hosted AuthKit logout URL when the
-  /// server reports one, so the caller can also end the WorkOS session.
-  Future<String?> logout() async {
-    String? logoutUrl;
-    try {
-      final response = await _http
-          .post(Uri.parse('$baseUrl/auth/logout'), headers: _headers());
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        if (body is Map && body['logout_url'] is String) {
-          final url = body['logout_url'] as String;
-          if (isWorkOSLogoutUrl(url)) logoutUrl = url;
-        }
-      }
-    } catch (_) {
-      // Clearing the local session still logs the tab out if the network call fails.
-    }
+  /// Revokes the server session before clearing this device's credentials.
+  Future<void> logout() async {
+    await _empty(() =>
+        _http.post(Uri.parse('$baseUrl/auth/logout'), headers: _headers()));
+    await clearSession();
+  }
+
+  Future<void> clearSession() async {
+    _twoFactorChallenge = null;
     _generation++;
     _token = null;
     _cookieSession = false;
     _valid = false;
     await _storage.clearToken();
-    return logoutUrl;
   }
 
   void _handleUnauthorized(int? generation) {
@@ -236,54 +231,6 @@ class ApiClient {
     throw ApiError.http(response.statusCode, response.body);
   }
 
-  Future<AuthConfig> getAuthConfig() async {
-    final gen = _generation;
-    return _send(
-      () => _http.get(Uri.parse('$baseUrl/auth/config'), headers: _headers()),
-      AuthConfig.fromJson,
-      generation: gen,
-    );
-  }
-
-  Future<String> workosAuthorizeUrl({String screenHint = 'sign-in'}) async {
-    final gen = _generation;
-    final response = await _http
-        .get(
-          Uri.parse('$baseUrl/auth/workos/authorize').replace(
-            queryParameters: {'screen_hint': screenHint},
-          ),
-          headers: _headers(),
-        )
-        .catchError((Object e) => throw ApiError.transport(e.toString()));
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final url = body['url'] as String?;
-      if (url == null || url.isEmpty) {
-        throw ApiError.http(response.statusCode, 'missing authorization url');
-      }
-      return url;
-    }
-    if (response.statusCode == 401) {
-      _handleUnauthorized(gen);
-    }
-    throw ApiError.http(response.statusCode, response.body);
-  }
-
-  Future<AuthResponse> completeWorkOSCallback(String code, String state) async {
-    final gen = _generation;
-    final result = await _send(
-      () => _http.post(
-        Uri.parse('$baseUrl/auth/workos/callback'),
-        headers: _headers(),
-        body: jsonEncode({'code': code, 'state': state}),
-      ),
-      AuthResponse.fromJson,
-      generation: gen,
-    );
-    await _setToken(result.token);
-    return result;
-  }
-
   Future<AuthResponse> register(
       String name, String email, String password) async {
     final gen = _generation;
@@ -308,11 +255,70 @@ class ApiClient {
         headers: _headers(),
         body: jsonEncode({'email': email, 'password': password}),
       ),
-      AuthResponse.fromJson,
+      (json) {
+        if (json['two_factor_required'] == true) {
+          _twoFactorChallenge = json['challenge'] as String?;
+          throw TwoFactorRequired();
+        }
+        return AuthResponse.fromJson(json);
+      },
       generation: gen,
     );
     await _setToken(result.token);
     return result;
+  }
+
+  Future<bool> googleAvailable() async => _send(
+        () => _http.get(Uri.parse('$baseUrl/auth/config'), headers: _headers()),
+        (json) => json['google'] == true,
+      );
+
+  Future<Map<String, dynamic>> startGoogle() => _send(
+        () => _http.post(
+            Uri.parse('$baseUrl/auth/${kIsWeb ? 'google' : 'native/start'}'),
+            headers: _headers()),
+        (json) => json,
+      );
+
+  Future<AuthResponse?> pollGoogle(Map<String, dynamic> flow) => _send(
+        () => _http.post(Uri.parse('$baseUrl/auth/native/poll'),
+            headers: _headers(),
+            body: jsonEncode({'id': flow['id'], 'verifier': flow['verifier']})),
+        (json) => json['pending'] == true ? null : AuthResponse.fromJson(json),
+      );
+
+  Future<void> adoptAuth(AuthResponse result) => _setToken(result.token);
+
+  Future<Map<String, dynamic>> twoFactor(String action,
+      {String? password, String? code, bool backup = false}) async {
+    final result = await _send(
+      () => _http.post(Uri.parse('$baseUrl/auth/two-factor/$action'),
+          headers: _headers(),
+          body: jsonEncode({
+            if (password != null) 'password': password,
+            if (code != null) 'code': code,
+            'backup': backup,
+            if (!_valid &&
+                _twoFactorChallenge != null &&
+                (action == 'verify-totp' || action == 'verify-backup-code'))
+              'challenge': _twoFactorChallenge,
+          })),
+      (json) => json,
+    );
+    if (result['token'] is String) await _setToken(result['token'] as String);
+    if (result['user'] != null) {
+      _twoFactorChallenge = null;
+      if (kIsWeb) adoptCookieSession();
+    }
+    return result;
+  }
+
+  Future<AuthResponse> verifyTwoFactor(String code,
+      {bool backup = false}) async {
+    final result = await twoFactor(
+        backup ? 'verify-backup-code' : 'verify-totp',
+        code: code);
+    return AuthResponse.fromJson(result);
   }
 
   Future<User> me() async {

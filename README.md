@@ -2,9 +2,9 @@
 
 Roomies helps roommates manage shared expenses, notes, balances, and house-scoped household workflows.
 
-- **Apps:** web, Android, Windows, Linux (Flutter)
-- **Server:** Go API + worker, PostgreSQL, behind Caddy
-- **Sign-in:** local email/password, or WorkOS AuthKit
+- **Apps:** web, Android, Windows, Linux (Flutter); alternative web client (Vite + React, shadcn/ui, Tailwind CSS)
+- **Server:** Go API + worker, Better Auth (TypeScript), PostgreSQL, behind Caddy
+- **Sign-in:** email/password, optional Google OAuth, and authenticator app 2FA through self-hosted Better Auth
 
 You only need Docker (Podman works too); no clone of this repo.
 
@@ -20,13 +20,12 @@ x-backend: &backend
   environment:
     DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD}@db:5432/roomies?sslmode=verify-full&sslrootcert=/tls/ca.crt
     APP_ENV: production
-    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
     ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL:?set ROOMIES_PUBLIC_BASE_URL in .env}
     CORS_ALLOWED_ORIGINS: ${ROOMIES_PUBLIC_BASE_URL}
     TLS_CERT_FILE: /tls/backend.crt
     TLS_KEY_FILE: /tls/backend.key
-    WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
-    WORKOS_API_KEY: ${WORKOS_API_KEY:-}
+    AUTH_URL: https://auth:3000
+    AUTH_CA_FILE: /tls/ca.crt
   volumes:
     - tls:/tls:ro
   depends_on:
@@ -68,10 +67,35 @@ services:
   backend:
     <<: *backend
     command: ["serve"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--no-check-certificate", "-O", "/dev/null", "https://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   worker:
     <<: *backend
     command: ["worker"]
+
+  auth:
+    image: ghcr.io/jobucaldas/roomies-auth:nightly
+    environment:
+      DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD}@db:5432/roomies
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL}
+    volumes:
+      - tls:/tls:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const https=require('https'),fs=require('fs');https.get('https://localhost:3000/api/auth/ok',{ca:fs.readFileSync('/tls/ca.crt')},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
 
   web:
     image: ghcr.io/jobucaldas/roomies-frontend:nightly
@@ -87,7 +111,8 @@ services:
       - caddy:/data
       - tls:/tls:ro
     depends_on:
-      - backend
+      auth:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
@@ -100,11 +125,9 @@ volumes:
 
 ```sh
 POSTGRES_PASSWORD=          # openssl rand -hex 24
-JWT_SECRET=                 # openssl rand -hex 48
+BETTER_AUTH_SECRET=          # openssl rand -hex 48
 ROOMIES_PUBLIC_BASE_URL=https://roomies.example.com   # or http://localhost:8080 to try it
 # SITE_ADDRESS=roomies.example.com                    # see the comment in compose.yaml
-# WORKOS_CLIENT_ID=client_...                         # optional, see below
-# WORKOS_API_KEY=sk_...
 ```
 
 **3. Start it:**
@@ -118,9 +141,17 @@ Open `ROOMIES_PUBLIC_BASE_URL`. With `APP_ENV: production` the server refuses to
 
 Optional backend variables (email invitations, Web Push, FCM) are listed with comments in [`.env.example`](.env.example); add the ones you set to the `x-backend` environment.
 
-**Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the API, and the API and worker reach PostgreSQL, over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
+**Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the API, the API reaches Better Auth, and all server services reach PostgreSQL over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
 
-**WorkOS AuthKit (optional).** Without it, people sign up with email and password. To use hosted sign-in, create a [WorkOS](https://workos.com/docs/authkit) project, set `WORKOS_CLIENT_ID` and `WORKOS_API_KEY`, and register `{ROOMIES_PUBLIC_BASE_URL}/callback` as a redirect URI.
+**Authentication.** [Better Auth](https://better-auth.com) runs in the `auth` container and uses the same PostgreSQL database. Sign up and sign in with email and password; email verification and password recovery are disabled, so SMTP is not required for authentication. Browser sessions use HttpOnly cookies; native apps use bearer tokens. Signing out revokes the session immediately. Set `BETTER_AUTH_SECRET` to a private random value of at least 32 characters. Keep this secret stable and back it up securely: it encrypts authenticator secrets and recovery codes.
+
+**Google sign-in (optional).** Create a Web application OAuth client in Google Cloud, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, and register `{ROOMIES_PUBLIC_BASE_URL}/api/auth/callback/google` as an authorized redirect URI (for local development: `http://localhost:8080/api/auth/callback/google`). Restart the auth service after changing these values. The Google button appears when both values are configured. Existing password accounts remain intact; accounts with the same email are not linked automatically. Sign in using the method that created the account.
+
+**Authenticator app 2FA.** In Settings → Account security (or Settings → Two-factor authentication in the alternative web client), set up an authenticator such as Google Authenticator, 1Password or Aegis. Scan the QR code or enter the setup key, save the single-use recovery codes, and confirm a 6-digit code to activate 2FA. Both password and Google sign-ins then require the second factor. No email or SMTP is involved. Disable 2FA with a current authenticator code (or an unused recovery code) and your password; Google-only accounts can leave the password blank. If you signed in within the last five minutes, you can leave the code blank, including after using your final recovery code. Recovery codes sign you in if the authenticator is lost. There is no email account recovery, so keep the recovery codes safe.
+
+On Android, Windows and Linux, Google opens in the system browser. Complete 2FA there if requested, confirm the displayed account, then return to Roomies. The app polls for a single-use handoff for up to five minutes; session tokens never appear in URLs. Restart sign-in if the API restarts during this handoff. Browser and native app share the resulting session, so signing out of that browser session revokes it in the app too.
+
+When upgrading, database migrations preserve existing local users, household memberships, and password hashes. Existing sessions end; sign in again with the same password. Accounts created only through WorkOS have no local password to migrate and cannot sign in until their credentials are imported; keep a backup before upgrading a WorkOS deployment.
 
 ## Apps
 
@@ -136,18 +167,54 @@ Everything runs through Docker Compose; no Go or Flutter install needed. The roo
 docker compose up --build    # optional: cp .env.example .env first
 ```
 
-Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, the Go API and worker (`go run` on the mounted `src/server/`), and `web`, which builds the Flutter web app from `src/app/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
+Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, Better Auth, the Go API and worker (`go run` on the mounted `src/server/`), and `web`, which builds the Flutter web app from `src/app/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
 
 | Changed | Do |
 |---|---|
 | `src/server/` | `docker compose restart backend worker` |
 | `src/app/` | `docker compose up --build -d web` |
+| `src/auth/` | `docker compose up --build -d auth` |
+
+### Alternative web client
+
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy and uses HttpOnly cookie sessions. It supports email/password, optional Google OAuth and authenticator 2FA, invitations, house switching and administration, expense splits and privacy, balances and settlement suggestions, notes, groceries, chores, calendar, notification preferences, scheduled reminders, and browser Web Push. The React client has three workspaces: Today (agenda, an editable shopping list, quick task panels and house notes), Money (a compact expense ledger, balances, and optional daily/category/six-month spending charts), and Household (shopping, chores, calendar and the noticeboard). Small actions open alongside the current workspace; members, notifications and account settings use side panels. Chore, event and note creation forms expand on request. The agenda expands calendar and enabled chore recurrences for the next 31 days, includes events in progress, excludes completed chore occurrences, and shows the first six entries alongside upcoming reminders. Financial charts default to shared expenses and offer a separate scope for expenses visible to the current member, with accessible data tables. Today refreshes every minute while visible and when the window regains focus. Balance suggestions cover all shared expenses; payments are not recorded. Settings include English, Portuguese and Spanish, display currency, appearance, mint or plum accent, and a default house. Currency settings change formatting; they do not convert amounts.
+
+Select the alternative on the same origin and port as Flutter (only one can use that port):
+
+```sh
+docker compose stop web
+docker compose up --build -d web-vite
+```
+
+Open <http://localhost:8080/> (or your configured `HTTP_PORT`). To switch back:
+
+```sh
+docker compose stop web-vite
+docker compose up --build -d web
+```
+
+For React development with hot reload, use the same origin and port instead of either built client:
+
+```sh
+docker compose stop web web-vite
+docker compose up --build -d web-dev
+```
+
+Open <http://localhost:8080/> (or your configured `HTTP_PORT`). Edits under `src/web/` reload automatically; restart `web-dev` after dependency or Vite configuration changes. The Vite proxy verifies the API certificate against the local CA. Stop `web-dev` before switching back to `web` or `web-vite`.
+
+The alternative is built locally; the published self-hosting image above continues to serve Flutter.
+
+The dashboard can create bounded daily, weekly, or monthly reminders using the existing server worker. Notification delivery requires member preferences and configured channels; the daily digest groups notifications rather than generating a financial report. `GET /api/houses/{id}/agenda` requires house membership and returns up to 200 calendar/chore occurrences with an explicit truncation flag. `GET /api/houses/{id}/chore-completions?from=YYYY-MM-DD&to=YYYY-MM-DD` requires house membership, uses an inclusive `from` and exclusive `to` in UTC, and accepts up to 366 days.
+
+House sections support deep links: `/house/{id}?tab=expenses` (also `notes`, `groceries`, `chores`, `calendar`, `balances`, `notifications`, and `members`). Invitations use `/accept-invitation?token=...`; `/dashboard?create=1` opens house creation. Browser push requires HTTPS or localhost, notification permission, and configured server Web Push keys. Neither client moves money when suggesting settlements.
 
 Checks and tools:
 
 ```sh
 docker compose run --rm test-backend    # gofmt, vet, tests (SQLite + Postgres)
+docker compose run --build --rm test-auth  # Better Auth type checks and PostgreSQL integration tests
 docker compose run --rm test-frontend   # flutter analyze + test
+docker compose run --build --rm --no-deps test-web  # Vite lint, unit/component tests, production build
 docker compose run --rm apk             # debug APK -> src/app/build/app/outputs/flutter-apk/
 ```
 
@@ -155,8 +222,10 @@ Windows and Linux builds need their own OS: `flutter build windows|linux --relea
 
 | Path | Role |
 |---|---|
+| `src/auth/` | Better Auth service; `Dockerfile` builds its runtime and test tooling |
 | `src/server/` | Go API and worker. `Dockerfile`: `dev` stage (toolchain used by compose) and the production image |
 | `src/app/` | Flutter app. `Dockerfile`: `local` builds the web bundle from source, `prebuilt` (default, what CI publishes) copies `build/web`; both serve it with Caddy and proxy `/api/*` (`SITE_ADDRESS`, `BACKEND_UPSTREAM`) |
+| `src/web/` | Alternative Vite + React web client; shadcn/ui components, Tailwind CSS v4. `web-vite` serves it through Caddy; `test-web` runs its checks |
 | `src/app/lib/` | `app/`: composition, routing and state; `core/`: API, storage and common utilities; `shared/`: widgets, theme and translations; `features/`: product flows. `test/` mirrors these folders |
 | `docker-compose.yml` | Development stack and tooling |
 | `.env.example` | Every config variable, with comments |
