@@ -126,7 +126,7 @@ Optional backend variables (email invitations, Web Push, FCM) are listed with co
 
 CI builds the Android APK, Windows bundle and Linux AppImage on every push as workflow artifacts. The native apps ask for your server's address on first launch. The web app is served by your server.
 
-Android release signing on `main` uses these repository secrets when present: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 upload-keystore.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Otherwise APKs use debug keys. Locally, put the same values in `src/frontend/android/key.properties` (gitignored).
+Android release signing on `main` uses these repository secrets when present: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 upload-keystore.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Otherwise APKs use debug keys. Locally, put the same values in `src/app/android/key.properties` (gitignored).
 
 ## Development
 
@@ -136,27 +136,28 @@ Everything runs through Docker Compose; no Go or Flutter install needed. The roo
 docker compose up --build    # optional: cp .env.example .env first
 ```
 
-Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, the Go API and worker (`go run` on the mounted `src/backend/`), and `web`, which builds the Flutter web app from `src/frontend/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
+Open <http://localhost:8080/> and sign up with any email and password. This starts Postgres, the Go API and worker (`go run` on the mounted `src/server/`), and `web`, which builds the Flutter web app from `src/app/` and serves it with Caddy next to the API. Change the port with `HTTP_PORT` and a matching `ROOMIES_PUBLIC_BASE_URL`. Stop with `docker compose down` (`-v` also wipes the database).
 
 | Changed | Do |
 |---|---|
-| `src/backend/` | `docker compose restart backend worker` |
-| `src/frontend/` | `docker compose up --build -d web` |
+| `src/server/` | `docker compose restart backend worker` |
+| `src/app/` | `docker compose up --build -d web` |
 
 Checks and tools:
 
 ```sh
 docker compose run --rm test-backend    # gofmt, vet, tests (SQLite + Postgres)
 docker compose run --rm test-frontend   # flutter analyze + test
-docker compose run --rm apk             # debug APK -> src/frontend/build/app/outputs/flutter-apk/
+docker compose run --rm apk             # debug APK -> src/app/build/app/outputs/flutter-apk/
 ```
 
-Windows and Linux builds need their own OS: `flutter build windows|linux --release` inside `src/frontend/`.
+Windows and Linux builds need their own OS: `flutter build windows|linux --release` inside `src/app/`.
 
 | Path | Role |
 |---|---|
-| `src/backend/` | Go API and worker. `Dockerfile`: `dev` stage (toolchain used by compose) and the production image |
-| `src/frontend/` | Flutter app. `Dockerfile`: `local` builds the web bundle from source, `prebuilt` (default, what CI publishes) copies `build/web`; both serve it with Caddy and proxy `/api/*` (`SITE_ADDRESS`, `BACKEND_UPSTREAM`) |
+| `src/server/` | Go API and worker. `Dockerfile`: `dev` stage (toolchain used by compose) and the production image |
+| `src/app/` | Flutter app. `Dockerfile`: `local` builds the web bundle from source, `prebuilt` (default, what CI publishes) copies `build/web`; both serve it with Caddy and proxy `/api/*` (`SITE_ADDRESS`, `BACKEND_UPSTREAM`) |
+| `src/app/lib/` | `app/`: composition, routing and state; `core/`: API, storage and common utilities; `shared/`: widgets, theme and translations; `features/`: product flows. `test/` mirrors these folders |
 | `docker-compose.yml` | Development stack and tooling |
 | `.env.example` | Every config variable, with comments |
 | `.github/workflows/ci.yml` | Checks on every push; on `main`, publishes `ghcr.io/jobucaldas/roomies-backend` and `roomies-frontend` as `:nightly` and `YYYYMMDDHHMMSS_<shortsha>` |

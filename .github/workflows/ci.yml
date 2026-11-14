@@ -30,7 +30,7 @@ jobs:
         with:
           go-version: '1.26.8'
       - run: go vet ./...
-        working-directory: src/backend
+        working-directory: src/server
         env:
           GOTOOLCHAIN: local
 
@@ -50,7 +50,7 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
-        working-directory: src/backend
+        working-directory: src/server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -86,14 +86,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
           retention-days: 3
 
   android:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -140,7 +140,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-android-apk-${{ github.sha }}
-          path: src/frontend/build/app/outputs/flutter-apk/app-release.apk
+          path: src/app/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -149,7 +149,7 @@ jobs:
     runs-on: windows-2022
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: src/app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -161,7 +161,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-windows-x64-${{ github.sha }}
-          path: src/frontend/build/windows/x64/runner/Release/
+          path: src/app/build/windows/x64/runner/Release/
           if-no-files-found: error
           retention-days: 14
 
@@ -181,11 +181,11 @@ jobs:
             https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage
           chmod +x "$RUNNER_TEMP/appimagetool"
       - run: flutter pub get
-        working-directory: src/frontend
+        working-directory: src/app
       - run: flutter build linux --release --dart-define=ROOMIES_API_URL=
-        working-directory: src/frontend
+        working-directory: src/app
       - name: Package AppImage
-        working-directory: src/frontend/build/linux
+        working-directory: src/app/build/linux
         env:
           APPIMAGETOOL: ${{ runner.temp }}/appimagetool
           # Runners have no FUSE; unpack appimagetool instead of mounting it.
@@ -213,7 +213,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: roomies-linux-appimage-${{ github.sha }}
-          path: src/frontend/build/linux/Roomies-x86_64.AppImage
+          path: src/app/build/linux/Roomies-x86_64.AppImage
           if-no-files-found: error
           retention-days: 14
 
@@ -226,13 +226,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
       - name: Development compose config
         run: docker compose config -q
       - name: Build images
         run: |
-          docker build -t ghcr.io/jobucaldas/roomies-backend:nightly src/backend
-          docker build --target prebuilt -t ghcr.io/jobucaldas/roomies-frontend:nightly src/frontend
+          docker build -t ghcr.io/jobucaldas/roomies-backend:nightly src/server
+          docker build --target prebuilt -t ghcr.io/jobucaldas/roomies-frontend:nightly src/app
       - name: Run the README compose file
         run: |
           mkdir smoke
@@ -267,7 +267,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: web-build
-          path: src/frontend/build/web
+          path: src/app/build/web
       - name: Compute image tags
         id: tags
         env:
@@ -291,8 +291,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: src/backend
-          file: src/backend/Dockerfile
+          context: src/server
+          file: src/server/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ steps.tags.outputs.owner }}/roomies-backend:nightly
@@ -301,7 +301,7 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: src/frontend
+          context: src/app
           target: prebuilt
           push: true
           tags: |

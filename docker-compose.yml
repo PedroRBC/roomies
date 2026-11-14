@@ -9,10 +9,10 @@ name: roomies
 
 x-backend: &backend
   build:
-    context: src/backend
+    context: src/server
     target: dev
   volumes:
-    - ./src/backend:/app:Z
+    - ./src/server:/app:Z
     - gocache:/root/.cache/go-build
     - gomod:/go/pkg/mod
     - tls:/tls:ro
@@ -46,10 +46,10 @@ services:
   # One-shot: private CA and certificates for TLS between containers.
   tls:
     build:
-      context: src/backend
+      context: src/server
       target: dev
     volumes:
-      - ./src/backend:/app:Z
+      - ./src/server:/app:Z
       - gocache:/root/.cache/go-build
       - gomod:/go/pkg/mod
       - tls:/tls
@@ -79,7 +79,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # API and background worker: `go run` on the mounted src/backend.
+  # API and background worker: `go run` on the mounted src/server.
   # After changing Go code: docker compose restart backend worker
   backend:
     <<: *backend
@@ -95,11 +95,11 @@ services:
     <<: *backend
     command: ["go", "run", ".", "worker"]
 
-  # Flutter web bundle built from src/frontend, served by Caddy next to the API.
+  # Flutter web bundle built from src/app, served by Caddy next to the API.
   # After changing the app: docker compose up --build -d web
   web:
     build:
-      context: src/frontend
+      context: src/app
       target: local
     ports:
       # HTTP_PORT must match the port in ROOMIES_PUBLIC_BASE_URL.
@@ -114,10 +114,10 @@ services:
   test-backend:
     profiles: [tools]
     build:
-      context: src/backend
+      context: src/server
       target: dev
     volumes:
-      - ./src/backend:/app:Z
+      - ./src/server:/app:Z
       - gocache:/root/.cache/go-build
       - gomod:/go/pkg/mod
       - tls:/tls:ro
@@ -132,17 +132,17 @@ services:
     profiles: [tools]
     image: ghcr.io/cirruslabs/flutter:3.27.1
     volumes:
-      - ./src/frontend:/workspace:Z
+      - ./src/app:/workspace:Z
     working_dir: /workspace
     command: ["bash", "-lc", "flutter pub get && flutter analyze && flutter test"]
 
   # Debug APK; it asks for a server on first launch.
-  # Output: src/frontend/build/app/outputs/flutter-apk/
+  # Output: src/app/build/app/outputs/flutter-apk/
   apk:
     profiles: [tools]
     image: ghcr.io/cirruslabs/flutter:3.27.1
     volumes:
-      - ./src/frontend:/workspace:Z
+      - ./src/app:/workspace:Z
     working_dir: /workspace
     command: ["bash", "-lc", "flutter pub get && flutter build apk --debug --dart-define=ROOMIES_API_URL="]
 
