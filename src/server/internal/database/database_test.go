@@ -231,6 +231,7 @@ func assertCurrentPostgresMigrationState(t *testing.T, db *sqlx.DB, legacyName s
 		{10, "revoked_sessions"},
 		{11, "better_auth"},
 		{12, "auth_two_factor"},
+		{13, "company_auth_identity"},
 	}
 	if len(ledger) != len(expected) {
 		t.Fatalf("unexpected migration ledger: %#v", ledger)
@@ -394,6 +395,7 @@ func TestSQLiteMigrationsUpgradeLegacySchema(t *testing.T) {
 		"revoked_sessions",
 		"better_auth",
 		"auth_two_factor",
+		"company_auth_identity",
 	}
 	if len(names) != len(wantNames) {
 		t.Fatalf("unexpected migration ledger names: %#v", names)
@@ -550,5 +552,44 @@ func TestBetterAuthMigrationPreservesLocalCredentials(t *testing.T) {
 	}
 	if err := db.Get(&count, `SELECT COUNT(*) FROM auth_account WHERE "userId" = 'hosted'`); err != nil || count != 0 {
 		t.Fatalf("must not invent a password for WorkOS users: %d %v", count, err)
+	}
+}
+
+func TestCompanyIdentityUpgradeFromVersion12(t *testing.T) {
+	for _, alreadyPresent := range []bool{false, true} {
+		t.Run(fmt.Sprintf("column_present_%v", alreadyPresent), func(t *testing.T) {
+			db, err := Connect("sqlite://:memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if err := RunMigrations(db); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO users (id,name,email,password_hash) VALUES ('existing','Local','local@example.test','preserved-hash')`); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version=13`); err != nil {
+				t.Fatal(err)
+			}
+			if !alreadyPresent {
+				if _, err := db.Exec(`DROP INDEX idx_users_auth_sub`); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := db.Exec(`ALTER TABLE users DROP COLUMN auth_sub`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := RunMigrations(db); err != nil {
+				t.Fatal(err)
+			}
+			var hash, sub string
+			if err := db.QueryRow(`SELECT password_hash,COALESCE(auth_sub,'') FROM users WHERE id='existing'`).Scan(&hash, &sub); err != nil {
+				t.Fatal(err)
+			}
+			if hash != "preserved-hash" || sub != "" {
+				t.Fatal("migration changed existing identity")
+			}
+		})
 	}
 }

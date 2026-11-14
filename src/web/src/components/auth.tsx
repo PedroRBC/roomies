@@ -259,11 +259,6 @@ export function Auth({
           </form>
           {factor ? (
             <>
-              {google && (
-                <Button variant="outline" disabled={busy} onClick={() => void signInGoogle()}>
-                  {t("Continue with Google", "Continuar com Google", "Continuar con Google")}
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 disabled={busy}
@@ -298,6 +293,11 @@ export function Auth({
             </>
           ) : (
             <>
+              {google && (
+                <Button variant="outline" disabled={busy} onClick={() => void signInGoogle()}>
+                  {t("Continue with Google", "Continuar com Google", "Continuar con Google")}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 disabled={busy}

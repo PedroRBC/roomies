@@ -53,3 +53,24 @@ it("does not sign in before TOTP and accepts a recovery code", async () => {
   await actor.click(screen.getByRole("button", { name: "Verify" }));
   expect(onLogin).toHaveBeenCalledWith(user);
 });
+
+it("keeps self-hosted login local without CompanyAuth branding", async () => {
+  const { api } = await import("@/lib/api");
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { company_auth: false, google: false };
+    throw new Error("Local form must not contact another provider");
+  });
+  render(<Auth onLogin={vi.fn()} />, { wrapper: PreferencesProvider });
+  expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+  expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  expect(screen.queryByText(/CompanyAuth|Caldas Studios/)).not.toBeInTheDocument();
+});
+
+it("shows only the central sign-in action when CompanyAuth is explicitly enabled", async () => {
+  const { api } = await import("@/lib/api");
+  vi.mocked(api).mockResolvedValue({ company_auth: true, google: false });
+  render(<Auth onLogin={vi.fn()} />, { wrapper: PreferencesProvider });
+  expect(await screen.findByRole("button", { name: "Continue with CompanyAuth" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+});

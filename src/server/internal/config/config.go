@@ -50,6 +50,7 @@ type Config struct {
 	BetterAuthSecret            string
 	GoogleClientID              string
 	GoogleClientSecret          string
+	AuthMode                    string
 	CaldasAuthURL               string
 	CaldasClientID              string
 	CaldasClientSecret          string
@@ -92,6 +93,7 @@ func Load() *Config {
 		BetterAuthSecret:            strings.TrimSpace(os.Getenv("BETTER_AUTH_SECRET")),
 		GoogleClientID:              strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID")),
 		GoogleClientSecret:          strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET")),
+		AuthMode:                    strings.ToLower(strings.TrimSpace(getEnv("ROOMIES_AUTH_MODE", "local"))),
 		CaldasAuthURL:               strings.TrimRight(strings.TrimSpace(os.Getenv("CALDAS_AUTH_URL")), "/"),
 		CaldasClientID:              strings.TrimSpace(os.Getenv("CALDAS_CLIENT_ID")),
 		CaldasClientSecret:          strings.TrimSpace(os.Getenv("CALDAS_CLIENT_SECRET")),
@@ -109,13 +111,18 @@ func (c *Config) Validate() error {
 	if (c.GoogleClientID == "") != (c.GoogleClientSecret == "") {
 		return errors.New("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be provided together")
 	}
-	if (c.CaldasAuthURL == "") != (c.CaldasClientID == "") || (c.CaldasClientID == "") != (c.CaldasClientSecret == "") {
-		return errors.New("CALDAS_AUTH_URL, CALDAS_CLIENT_ID, and CALDAS_CLIENT_SECRET must be provided together")
+	if c.AuthMode != "" && c.AuthMode != "local" && c.AuthMode != "companyauth" {
+		return errors.New("ROOMIES_AUTH_MODE must be local or companyauth")
 	}
-	if c.CaldasAuthURL != "" {
-		u, err := url.Parse(c.CaldasAuthURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
-			return errors.New("CALDAS_AUTH_URL must be an https origin")
+	if c.AuthMode == "companyauth" {
+		if c.CaldasAuthURL == "" || c.CaldasClientID == "" || c.CaldasClientSecret == "" {
+			return errors.New("CALDAS_AUTH_URL, CALDAS_CLIENT_ID, and CALDAS_CLIENT_SECRET must be provided together")
+		}
+		if c.CaldasAuthURL != "" {
+			u, err := url.Parse(c.CaldasAuthURL)
+			if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+				return errors.New("CALDAS_AUTH_URL must be an https origin")
+			}
 		}
 	}
 	if c.Environment == "production" {

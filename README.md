@@ -25,10 +25,7 @@ x-backend: &backend
     TLS_CERT_FILE: /tls/backend.crt
     TLS_KEY_FILE: /tls/backend.key
     BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
-    CALDAS_AUTH_URL: ${CALDAS_AUTH_URL:-}
-    CALDAS_CLIENT_ID: ${CALDAS_CLIENT_ID:-}
-    CALDAS_CLIENT_SECRET: ${CALDAS_CLIENT_SECRET:-}
-    CALDAS_REDIRECT_URL: ${CALDAS_REDIRECT_URL:-}
+    ROOMIES_AUTH_MODE: ${ROOMIES_AUTH_MODE:-local}
   volumes:
     - tls:/tls:ro
   depends_on:
@@ -126,7 +123,7 @@ Optional backend variables (email invitations, Web Push, FCM) are listed with co
 
 **Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the single Go API and all server services reach PostgreSQL over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
 
-**Authentication.** The published Docker setup runs local authentication inside the Roomies server. Start the stack with Docker Compose and create accounts with the local email/password flow; no external identity service is required.
+**Authentication.** The published Docker setup runs local authentication inside the Roomies server. Start the stack with Docker Compose, choose Create an account, and sign in with your email and password. Authentication runs in the same server and database as Roomies; no external identity service or authentication credentials are required. Local authentication is the default even when unused external provider credentials exist in the environment.
 
 When upgrading, database migrations preserve existing local users and household memberships. Existing sessions end; sign in again with the local account.
 

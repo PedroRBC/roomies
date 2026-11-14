@@ -268,10 +268,13 @@ class ApiClient {
     return result;
   }
 
-  Future<bool> googleAvailable() async => _send(
+  Future<Map<String, dynamic>> authConfig() => _send(
         () => _http.get(Uri.parse('$baseUrl/auth/config'), headers: _headers()),
-        (json) => json['google'] == true,
+        (json) => json,
       );
+
+  Future<bool> googleAvailable() async =>
+      (await authConfig())['google'] == true;
 
   Future<Map<String, dynamic>> startGoogle() => _send(
         () => _http.post(

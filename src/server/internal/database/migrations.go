@@ -86,8 +86,6 @@ func migrations(driver string) []schemaMigration {
 		},
 		{version: 12, name: "auth_two_factor", up: execStatements(
 			`ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE`,
-			`ALTER TABLE users ADD COLUMN auth_sub TEXT`,
-			`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_sub ON users(auth_sub) WHERE auth_sub IS NOT NULL AND auth_sub != ''`,
 			`CREATE TABLE auth_two_factor (
                 id TEXT PRIMARY KEY,
                 secret TEXT NOT NULL,
@@ -98,6 +96,48 @@ func migrations(driver string) []schemaMigration {
                 "lockedUntil" TIMESTAMP
             )`,
 		)},
+		{version: 13, name: "company_auth_identity", up: companyIdentityMigration(driver)},
+	}
+}
+
+// Earlier development builds added this column in version 12. Accept both layouts.
+func companyIdentityMigration(driver string) func(context.Context, migrationRunner) error {
+	return func(ctx context.Context, exec migrationRunner) error {
+		exists := false
+		if driver == "sqlite3" {
+			rows, err := exec.QueryContext(ctx, `PRAGMA table_info(users)`)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var cid, notNull, pk int
+				var name, kind string
+				var defaultValue sql.NullString
+				if err := rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &pk); err != nil {
+					rows.Close()
+					return err
+				}
+				if name == "auth_sub" {
+					exists = true
+				}
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return err
+			}
+		} else {
+			if err := exec.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='users' AND column_name='auth_sub')`).Scan(&exists); err != nil {
+				return err
+			}
+		}
+		if !exists {
+			if _, err := exec.ExecContext(ctx, `ALTER TABLE users ADD COLUMN auth_sub TEXT`); err != nil {
+				return err
+			}
+		}
+		_, err := exec.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_sub ON users(auth_sub) WHERE auth_sub IS NOT NULL AND auth_sub != ''`)
+		return err
 	}
 }
 

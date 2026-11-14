@@ -329,7 +329,11 @@ func (h *AuthHandler) NativeStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.native.entries[id] = &nativeSignIn{verifier: sha256.Sum256([]byte(verifier)), expires: time.Now().Add(5 * time.Minute)}
-	writeJSON(w, 200, map[string]string{"id": id, "verifier": verifier, "url": h.publicBaseURL + "/api/auth/google?native=" + id})
+	path := "/api/auth/google"
+	if h.company != nil {
+		path = "/api/auth/login"
+	}
+	writeJSON(w, 200, map[string]string{"id": id, "verifier": verifier, "url": h.publicBaseURL + path + "?native=" + id})
 }
 func (h *AuthHandler) NativePoll(w http.ResponseWriter, r *http.Request) {
 	if !h.allowedOrigin(w, r) {

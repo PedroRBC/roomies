@@ -23,6 +23,7 @@ x-backend: &backend
     ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL:-http://localhost:8080}
     CORS_ALLOWED_ORIGINS: ${ROOMIES_PUBLIC_BASE_URL:-http://localhost:8080}
     BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-roomies-local-development-secret-change-before-hosting}
+    ROOMIES_AUTH_MODE: ${ROOMIES_AUTH_MODE:-local}
     CALDAS_AUTH_URL: ${CALDAS_AUTH_URL:-}
     CALDAS_CLIENT_ID: ${CALDAS_CLIENT_ID:-}
     CALDAS_CLIENT_SECRET: ${CALDAS_CLIENT_SECRET:-}

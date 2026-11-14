@@ -56,6 +56,8 @@ class RoomiesStrings {
       'Senha atual (deixe em branco se usa apenas Google)',
       'Contraseña actual (deja en blanco si solo usas Google)');
   String get verifyCode => _t('Verify', 'Verificar', 'Verificar');
+  String get companySignIn => _t('Continue with CompanyAuth',
+      'Continuar com CompanyAuth', 'Continuar con CompanyAuth');
   String get googleSignIn => _t(
       'Continue with Google', 'Continuar com Google', 'Continuar con Google');
   String get googleWaiting => _t(

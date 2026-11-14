@@ -105,3 +105,29 @@ func TestProductionConfigRequiresEncryptedTransport(t *testing.T) {
 		t.Fatalf("expected loopback trial origin to validate: %v", err)
 	}
 }
+
+func TestAuthenticationModeDefaultsToLocal(t *testing.T) {
+	t.Setenv("ROOMIES_AUTH_MODE", "")
+	t.Setenv("CALDAS_AUTH_URL", "https://auth.example.test")
+	t.Setenv("CALDAS_CLIENT_ID", "")
+	t.Setenv("CALDAS_CLIENT_SECRET", "")
+	cfg := Load()
+	if cfg.AuthMode != "local" {
+		t.Fatalf("default mode = %q", cfg.AuthMode)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("unused company credentials must not prevent local startup: %v", err)
+	}
+	cfg.AuthMode = "companyauth"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("company mode must require credentials")
+	}
+	cfg.CaldasClientID, cfg.CaldasClientSecret = "client", "secret"
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	cfg.AuthMode = "invalid"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("unknown auth mode accepted")
+	}
+}
