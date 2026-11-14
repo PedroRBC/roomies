@@ -1,4 +1,3 @@
-import { StrictMode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -9,6 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
+import { clearInvitation } from "@/features/invitation-state";
 import { api, ApiError } from "@/lib/api";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
@@ -17,6 +17,9 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 afterEach(() => {
   cleanup();
+  localStorage.clear();
+  sessionStorage.clear();
+  clearInvitation();
   vi.resetAllMocks();
   window.history.replaceState(null, "", "/");
 });
@@ -24,7 +27,7 @@ const user = { id: "me", name: "Alex", email: "a@example.com" };
 
 it("signs in with cookies and creates a first house", async () => {
   vi.mocked(api).mockImplementation(async (path, options) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/config") return { password: true, google: false };
     if (path === "/auth/me") throw new ApiError(401, "unauthorized");
     if (path === "/auth/login") return { user };
     if (path === "/houses")
@@ -38,9 +41,6 @@ it("signs in with cookies and creates a first house", async () => {
   });
   const actor = userEvent.setup();
   render(<App />);
-  await actor.click(
-    await screen.findByRole("button", { name: "Use email and password" }),
-  );
   await actor.type(await screen.findByLabelText("Email"), "a@example.com");
   await actor.type(screen.getByLabelText("Password"), "password123");
   await actor.click(screen.getByRole("button", { name: "Sign in" }));
@@ -60,52 +60,6 @@ it("signs in with cookies and creates a first house", async () => {
   });
 });
 
-it("uses hosted sign-in exclusively when password auth is disabled", async () => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: false, authkit: true };
-    throw new ApiError(401, "unauthorized");
-  });
-  render(<App />);
-  expect(
-    await screen.findByRole("button", { name: "Sign in" }),
-  ).toBeInTheDocument();
-  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-});
-
-it("consumes the WorkOS callback only once in StrictMode and clears its URL", async () => {
-  window.history.replaceState(
-    null,
-    "",
-    "/callback?code=one-use-code&state=expected-state",
-  );
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: false, authkit: true };
-    if (path === "/auth/me") return user;
-    return [];
-  });
-  render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
-  await screen.findByLabelText("House name");
-  expect(
-    vi
-      .mocked(api)
-      .mock.calls.filter(([path]) => path === "/auth/workos/callback"),
-  ).toEqual([
-    [
-      "/auth/workos/callback",
-      {
-        method: "POST",
-        body: JSON.stringify({ code: "one-use-code", state: "expected-state" }),
-      },
-    ],
-  ]);
-  expect(window.location.pathname).toBe("/dashboard");
-  expect(window.location.search).toBe("");
-});
-
 it("shows a recoverable startup error instead of an empty login screen", async () => {
   vi.mocked(api).mockRejectedValue(new ApiError(503, "Service unavailable"));
   render(<App />);
@@ -118,27 +72,32 @@ it("shows a recoverable startup error instead of an empty login screen", async (
 it.each([
   new Error("Network unavailable"),
   new ApiError(500, "Logout unavailable"),
-])("clears the private workspace when logout fails: %s", async (failure) => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
-    if (path === "/auth/me") return user;
-    if (path === "/auth/logout") throw failure;
-    return [];
-  });
-  const actor = userEvent.setup();
-  render(<App />);
-  await actor.click(await screen.findByRole("button", { name: "Sign out" }));
-  expect(
-    await screen.findByRole("button", { name: "Use email and password" }),
-  ).toBeInTheDocument();
-  expect(screen.queryByLabelText("Navigation")).not.toBeInTheDocument();
-  expect(screen.getByRole("alert")).toHaveTextContent(failure.message);
-});
+])(
+  "keeps the session available to retry logout when revocation fails: %s",
+  async (failure) => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/auth/config") return { password: true, google: false };
+      if (path === "/auth/me") return user;
+      if (path === "/auth/logout") throw failure;
+      return [];
+    });
+    const actor = userEvent.setup();
+    render(<App />);
+    await actor.click(await screen.findByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(failure.message),
+    );
+    expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  },
+);
 
 it("opens create-house from the shared switcher", async () => {
   window.history.replaceState(null, "", "/dashboard");
   vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/config") return { password: true, google: false };
     if (path === "/auth/me") return user;
     if (path === "/houses") return [{ id: "one", name: "Our home" }];
     return [];
@@ -155,38 +114,9 @@ it("opens create-house from the shared switcher", async () => {
   expect(window.location.search).toBe("?create=1");
 });
 
-it("keeps password sign-in collapsed and allows hiding the form", async () => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
-    throw new ApiError(401, "unauthorized");
-  });
-  const actor = userEvent.setup();
-  render(<App />);
-  await screen.findByRole("button", { name: "Use email and password" });
-  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-  await actor.click(
-    screen.getByRole("button", { name: "Use email and password" }),
-  );
-  expect(screen.getByLabelText("Password")).toBeInTheDocument();
-  await actor.click(screen.getByRole("button", { name: "Hide" }));
-  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-});
-it("uses a single hosted entry when both auth methods are configured", async () => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: true, authkit: true };
-    throw new ApiError(401, "unauthorized");
-  });
-  render(<App />);
-  await screen.findByRole("button", { name: "Sign in" });
-  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Use email and password" }),
-  ).not.toBeInTheDocument();
-});
-
 it("closes the mobile drawer when a house section is selected", async () => {
   vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/config") return { password: true, google: false };
     if (path === "/auth/me") return user;
     if (path === "/houses") return [{ id: "one", name: "Our home" }];
     if (path === "/houses/one") return { id: "one", name: "Our home" };
@@ -204,4 +134,86 @@ it("closes the mobile drawer when a house section is selected", async () => {
   );
   expect(window.location.pathname).toBe("/house/one");
   expect(window.location.search).toBe("?tab=notes");
+});
+
+it("keeps Google and authenticator security available with the new settings route", async () => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, google: true };
+    if (path === "/auth/me") throw new ApiError(401, "unauthorized");
+    return [];
+  });
+  const view = render(<App />);
+  expect(
+    await screen.findByRole("button", { name: "Continue with Google" }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  view.unmount();
+  window.history.replaceState(null, "", "/settings");
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === "/auth/me" ? { ...user, two_factor_enabled: true } : [],
+  );
+  render(<App />);
+  expect(
+    await screen.findByRole("button", {
+      name: "Disable two-factor authentication",
+    }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Authenticator code")).toBeInTheDocument();
+});
+
+it("uses the registration route and returns to password sign-in", async () => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { google: false };
+    throw new ApiError(401, "unauthorized");
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await actor.click(
+    await screen.findByRole("button", { name: "Create an account" }),
+  );
+  expect(window.location.pathname).toBe("/register");
+  expect(screen.getByLabelText("Your name")).toBeInTheDocument();
+  await actor.click(
+    screen.getByRole("button", { name: "Already have an account? Sign in" }),
+  );
+  expect(window.location.pathname).toBe("/");
+  expect(screen.queryByLabelText("Your name")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Password")).toBeInTheDocument();
+});
+
+it("resumes a pending invitation only after the authenticator challenge succeeds", async () => {
+  window.history.replaceState(
+    null,
+    "",
+    "/accept-invitation?token=pending-invite",
+  );
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { google: false };
+    if (path === "/auth/me") throw new ApiError(401, "unauthorized");
+    if (path === "/auth/login") return { two_factor_required: true };
+    if (path === "/auth/two-factor/verify-totp") return { user };
+    if (path === "/invitations/accept")
+      return { invitation: { house_id: "invited-house" } };
+    return [];
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await actor.type(await screen.findByLabelText("Email"), "a@example.com");
+  await actor.type(screen.getByLabelText("Password"), "password123");
+  await actor.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(screen.getByLabelText("Authenticator code")).toBeInTheDocument();
+  expect(
+    vi.mocked(api).mock.calls.some(([path]) => path === "/invitations/accept"),
+  ).toBe(false);
+  await actor.type(screen.getByLabelText("Authenticator code"), "123456");
+  await actor.click(screen.getByRole("button", { name: "Verify" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: "pending-invite" }),
+    }),
+  );
+  await waitFor(() =>
+    expect(window.location.pathname).toBe("/house/invited-house"),
+  );
 });

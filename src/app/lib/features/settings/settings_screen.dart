@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/money.dart';
+import 'account_security.dart';
 import '../../shared/l10n/strings.dart';
 import '../../core/models/models.dart';
 import '../../app/app_state.dart';
@@ -48,6 +49,7 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       if (signedIn) _AccountCard(user: app.user!, strings: s),
+      if (signedIn) const AccountSecurity(),
       _Section(
         title: s.language,
         child: Column(

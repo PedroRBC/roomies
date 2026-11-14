@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Auth } from "@/components/auth";
-import type { AuthConfig } from "@/components/auth";
+import { Security } from "@/components/security";
 import { AppShell } from "@/components/app-shell";
 import { HouseWorkspace } from "@/components/house-workspace";
 import { Dashboard } from "@/features/dashboard";
@@ -14,33 +14,17 @@ import {
 } from "@/features/invitation-state";
 import { PreferencesProvider, usePreferences } from "@/lib/preferences";
 import { houseLink, readRoute, useRoute } from "@/lib/navigation";
-import { api, ApiError, workosUrl } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { House, User } from "@/lib/api";
 async function bootstrap() {
   captureInvitation();
-  const params = new URLSearchParams(window.location.search);
-  const callback = window.location.pathname === "/callback";
-  const code = params.get("code"),
-    state = params.get("state"),
-    error = params.get("error_description") ?? params.get("error");
-  if (callback) window.history.replaceState(null, "", "/");
-  const config = await api<AuthConfig>("/auth/config");
-  if (callback) {
-    if (error) throw new Error(error);
-    if (!code || !state)
-      throw new Error("Sign-in was not completed. Please try again.");
-    await api("/auth/workos/callback", {
-      method: "POST",
-      body: JSON.stringify({ code, state }),
-    });
-  }
   let user: User | null = null;
   try {
     user = await api<User>("/auth/me");
   } catch (err) {
     if (!(err instanceof ApiError) || err.status !== 401) throw err;
   }
-  return { config, user, callback };
+  return { user };
 }
 export default function App() {
   return (
@@ -53,7 +37,6 @@ function AppContent() {
   const { t, preferences, setPreference } = usePreferences();
   const route = useRoute();
   const { navigate } = route;
-  const [config, setConfig] = useState<AuthConfig | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [houses, setHouses] = useState<House[]>([]);
   const [focus, setFocus] = useState("");
@@ -84,11 +67,8 @@ function AppContent() {
     startup.current
       .then((result) => {
         if (active) {
-          setConfig(result.config);
           setUser(result.user);
-          freshLogin.current = result.callback;
           setHouseLoading(!!result.user);
-          if (result.callback) navigate("/", true);
         }
       })
       .catch((err: Error) => {
@@ -181,20 +161,20 @@ function AppContent() {
     );
   else if (route.path === "/settings")
     content = (
-      <Settings
-        user={user}
-        houses={houses}
-        onRefresh={refreshHouses}
-        onUnauthorized={onUnauthorized}
-      />
+      <div className="mx-auto w-full max-w-[520px]">
+        {user && <Security user={user} onChange={setUser} />}
+        <Settings
+          user={user}
+          houses={houses}
+          onRefresh={refreshHouses}
+          onUnauthorized={onUnauthorized}
+        />
+      </div>
     );
   else if (!user)
-    content = config && (
+    content = (
       <Auth
-        config={config}
         onLogin={login}
-        run={run}
-        busy={busy}
         register={route.path === "/register"}
         navigate={navigate}
       />
@@ -271,16 +251,8 @@ function AppContent() {
       busy={busy}
       onLogout={() =>
         void run(async () => {
-          let result: { logout_url?: string } | undefined;
-          try {
-            result = await api<{ logout_url?: string }>("/auth/logout", {
-              method: "POST",
-            });
-          } finally {
-            onUnauthorized();
-          }
-          if (result?.logout_url)
-            window.location.assign(workosUrl(result.logout_url, "logout"));
+          await api("/auth/logout", { method: "POST" });
+          onUnauthorized();
         })
       }
     >

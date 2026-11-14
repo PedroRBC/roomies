@@ -55,7 +55,8 @@ class AppState extends ChangeNotifier {
   RoomiesStrings get strings => RoomiesStrings(localeCode);
 
   /// Currency used for display right now.
-  String get currencyCode => currencyOverride ?? currencyForLanguage(localeCode);
+  String get currencyCode =>
+      currencyOverride ?? currencyForLanguage(localeCode);
 
   /// Formats [amount] with the current language and currency settings.
   String money(double amount) =>
@@ -76,8 +77,7 @@ class AppState extends ChangeNotifier {
     localeOverride = await preferences.loadLocaleOverride();
     themeOverride = await preferences.loadThemeOverride();
     final currency = await preferences.loadCurrencyOverride();
-    currencyOverride =
-        supportedCurrencies.contains(currency) ? currency : null;
+    currencyOverride = supportedCurrencies.contains(currency) ? currency : null;
     brandAccent = BrandAccentX.fromId(await preferences.loadBrandAccent());
     defaultHouseId = await preferences.loadDefaultHouseId();
     _applyLocale();
@@ -148,7 +148,7 @@ class AppState extends ChangeNotifier {
     return house;
   }
 
-  /// Destination after a restored session (not a fresh AuthKit/password login).
+  /// Destination after a restored session (not a fresh password login).
   /// Returns `null` for fresh logins so the caller can force `/dashboard`.
   String? restoredHomePath() {
     if (!restoredExistingSession) return null;
@@ -172,7 +172,7 @@ class AppState extends ChangeNotifier {
         await refreshHouses();
       } on ApiError catch (error) {
         if (error.status == 401) {
-          await api.logout();
+          await api.clearSession();
         } else {
           api.invalidateSession();
         }
@@ -190,7 +190,7 @@ class AppState extends ChangeNotifier {
         await refreshHouses();
       } on ApiError catch (error) {
         if (error.status == 401) {
-          await api.logout();
+          await api.clearSession();
         } else {
           api.invalidateSession();
         }
@@ -217,16 +217,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Signs out locally. Returns the hosted AuthKit logout URL when the
-  /// session came from AuthKit; callers should open it so the WorkOS session
-  /// ends too and the next sign-in can pick a different account.
-  Future<String?> logout() async {
-    final logoutUrl = await api.logout();
+  Future<void> logout() async {
+    await api.logout();
     user = null;
     houses = const [];
     restoredExistingSession = false;
     notifyListeners();
-    return logoutUrl;
   }
 }
 

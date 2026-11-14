@@ -267,7 +267,7 @@ func TestAcceptInvitationUsesCurrentDatabaseEmail(t *testing.T) {
 	}
 	rejected := acceptInvitation(t, env.Router, inviteeToken, manualInvitationToken(t, stale.ManualAcceptanceURL))
 	if rejected.Code != http.StatusNotFound {
-		t.Fatalf("stale jwt email accepted invite: %d %s", rejected.Code, rejected.Body.String())
+		t.Fatalf("stale session email accepted invite: %d %s", rejected.Code, rejected.Body.String())
 	}
 	fresh := createInvitation(t, env.Router, adminToken, houseID, models.CreateInvitationRequest{Email: "renamed@example.test", Role: "member"}, "invite-fresh")
 	accepted := acceptInvitation(t, env.Router, inviteeToken, manualInvitationToken(t, fresh.ManualAcceptanceURL))

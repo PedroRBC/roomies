@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/auth/open_url.dart';
 import '../../core/house_tabs.dart';
 import '../l10n/strings.dart';
 import '../../core/models/models.dart';
@@ -139,9 +137,13 @@ class _AppShellState extends State<AppShell> {
       onAction: (tab) => _openAction(context, app, s, activeHouseId, tab),
       onSettings: () => context.go('/settings'),
       onLogout: () async {
-        final logoutUrl = await app.logout();
-        if (logoutUrl != null && kIsWeb) {
-          openExternalUrl(logoutUrl);
+        try {
+          await app.logout();
+        } catch (error) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(app.strings.serverUnreachable)));
+          }
           return;
         }
         if (context.mounted) context.go('/');
@@ -584,9 +586,8 @@ class _NavTile extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       child: Material(
-        color: selected
-            ? RoomiesPalette.of(context).tealSoft
-            : Colors.transparent,
+        color:
+            selected ? RoomiesPalette.of(context).tealSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),

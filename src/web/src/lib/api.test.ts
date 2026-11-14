@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { api, ApiError, workosUrl } from "./api";
+import { api, ApiError } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -49,21 +49,4 @@ it("handles non-JSON errors and empty successful responses", async () => {
   await expect(
     api("/auth/logout", { method: "POST" }),
   ).resolves.toBeUndefined();
-});
-
-it("only accepts the expected HTTPS WorkOS redirect endpoint", () => {
-  expect(
-    workosUrl(
-      "https://api.workos.com/user_management/authorize?state=a",
-      "authorize",
-    ),
-  ).toContain("workos.com");
-  for (const url of [
-    "https://evil.test/user_management/authorize",
-    "http://api.workos.com/user_management/authorize",
-    "javascript:alert(1)",
-    "https://api.workos.com@evil.test/user_management/authorize",
-  ]) {
-    expect(() => workosUrl(url, "authorize")).toThrow();
-  }
 });

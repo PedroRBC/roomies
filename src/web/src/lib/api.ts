@@ -39,26 +39,8 @@ export async function api<T>(
   return response.json();
 }
 
-export function workosUrl(value: string, action: "authorize" | "logout") {
-  const url = new URL(value);
-  const path =
-    action === "authorize"
-      ? "/user_management/authorize"
-      : "/user_management/sessions/logout";
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "api.workos.com" ||
-    url.port ||
-    url.username ||
-    url.password ||
-    url.pathname !== path
-  ) {
-    throw new Error("The sign-in service returned an invalid redirect URL.");
-  }
-  return url.href;
-}
-
 export interface User {
+  two_factor_enabled?: boolean;
   id: string;
   name: string;
   email: string;
