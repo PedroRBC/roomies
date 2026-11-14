@@ -68,6 +68,7 @@ export interface House {
   name: string;
 }
 export interface Member {
+  user_email?: string;
   user_id: string;
   user_name: string;
   role: string;

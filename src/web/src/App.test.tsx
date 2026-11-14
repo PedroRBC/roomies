@@ -38,7 +38,7 @@ it("signs in with cookies and creates a first house", async () => {
   await actor.type(await screen.findByLabelText("House name"), "Our home");
   await actor.click(screen.getByRole("button", { name: "Create house" }));
   expect(
-    await screen.findByRole("heading", { name: "Our home" }),
+    await screen.findByRole("button", { name: "Our home" }),
   ).toBeInTheDocument();
   expect(api).toHaveBeenCalledWith("/auth/login", {
     method: "POST",
@@ -88,7 +88,7 @@ it("consumes the WorkOS callback only once in StrictMode and clears its URL", as
       },
     ],
   ]);
-  expect(window.location.pathname).toBe("/");
+  expect(window.location.pathname).toBe("/dashboard");
   expect(window.location.search).toBe("");
 });
 
@@ -99,4 +99,37 @@ it("shows a recoverable startup error instead of an empty login screen", async (
     expect(screen.getByRole("alert")).toHaveTextContent("Service unavailable"),
   );
   expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+});
+
+
+it.each([new Error("Network unavailable"), new ApiError(500, "Logout unavailable")])("clears the private workspace when logout fails: %s", async (failure) => {
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/me") return user;
+    if (path === "/auth/logout") throw failure;
+    return [];
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await actor.click(await screen.findByRole("button", { name: "Sign out" }));
+  expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("Navigation")).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(failure.message);
+});
+
+
+it("opens create-house from the shared switcher", async () => {
+  window.history.replaceState(null, "", "/dashboard");
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { password: true, authkit: false };
+    if (path === "/auth/me") return user;
+    if (path === "/houses") return [{ id: "one", name: "Our home" }];
+    return [];
+  });
+  const actor = userEvent.setup();
+  render(<App />);
+  await actor.click(await screen.findByRole("combobox", { name: "Your house" }));
+  await actor.click(await screen.findByRole("option", { name: "Create house" }));
+  expect(await screen.findByLabelText("House name")).toBeInTheDocument();
+  expect(window.location.search).toBe("?create=1");
 });

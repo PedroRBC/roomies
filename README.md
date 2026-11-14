@@ -145,7 +145,7 @@ Open <http://localhost:8080/> and sign up with any email and password. This star
 
 ### Alternative web client
 
-The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy, uses HttpOnly cookie sessions, and supports password or WorkOS sign-in, house creation and switching, shared equal-split expenses, balances, settlement suggestions, and notes. Amounts currently display in USD. Other household features and editing/deletion remain available in Flutter.
+The Vite + React client in `src/web/` uses shadcn/ui components and Tailwind CSS v4. It connects to the same Go API through Caddy and uses HttpOnly cookie sessions. It supports password or WorkOS sign-in, invitations, house switching and administration, expense splits and privacy, balances and settlement suggestions, notes, groceries, chores, calendar, notification preferences, scheduled reminders, and browser Web Push. The dashboard shows monthly spending, upcoming items, and rotating notes. Settings include English, Portuguese and Spanish, display currency, appearance, mint or plum accent, and a default house. Currency settings change formatting; they do not convert amounts.
 
 Select the alternative on the same origin and port as Flutter (only one can use that port):
 
@@ -162,6 +162,8 @@ docker compose up --build -d web
 ```
 
 The alternative is built locally; the published self-hosting image above continues to serve Flutter. WorkOS uses the same `{ROOMIES_PUBLIC_BASE_URL}/callback` redirect.
+
+House sections support deep links: `/house/{id}?tab=expenses` (also `notes`, `groceries`, `chores`, `calendar`, `balances`, `notifications`, and `members`). Invitations use `/accept-invitation?token=...`; `/dashboard?create=1` opens house creation. Browser push requires HTTPS or localhost, notification permission, and configured server Web Push keys. Neither client moves money when suggesting settlements.
 
 Checks and tools:
 
