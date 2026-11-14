@@ -108,15 +108,24 @@ function show(
   );
 }
 
+async function choose(
+  actor: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string,
+) {
+  await actor.click(screen.getByRole("combobox", { name: label }));
+  await actor.click(await screen.findByRole("option", { name: option }));
+}
+
 it("creates a private expense with exact custom splits and monitor visibility only", async () => {
   const actor = userEvent.setup();
   show(Expenses);
   await actor.click(await screen.findByRole("button", { name: "Add expense" }));
   await actor.type(screen.getByLabelText("Amount"), "10,01");
   await actor.type(screen.getByLabelText("Description"), "Dinner");
-  await actor.click(screen.getByRole("radio", { name: "Private" }));
+  await choose(actor, "Visibility", "Private");
   await actor.click(screen.getByRole("checkbox", { name: "Mo" }));
-  await actor.click(screen.getByRole("radio", { name: "Custom splits" }));
+  await choose(actor, "Custom splits", "Custom splits");
   expect(screen.queryByLabelText("Share for Mo")).not.toBeInTheDocument();
   await actor.type(screen.getByLabelText("Share for Alex"), "5");
   await actor.type(screen.getByLabelText("Share for Bea"), "5.01");
@@ -154,7 +163,7 @@ it("keeps expense inputs and custom splits after a failed save and allows retry"
   await actor.click(await screen.findByRole("button", { name: "Add expense" }));
   await actor.type(screen.getByLabelText("Amount"), "12.34");
   await actor.type(screen.getByLabelText("Description"), "Dinner");
-  await actor.click(screen.getByRole("radio", { name: "Custom splits" }));
+  await choose(actor, "Custom splits", "Custom splits");
   await actor.type(screen.getByLabelText("Share for Alex"), "6");
   await actor.type(screen.getByLabelText("Share for Bea"), "6.34");
   await actor.click(screen.getByRole("button", { name: "Save expense" }));
@@ -188,6 +197,9 @@ it("shows persisted detail splits and preserves them on metadata edits", async (
     await screen.findByRole("button", { name: "Details / edit" }),
   );
   const dialog = await screen.findByRole("dialog");
+  await actor.click(
+    within(dialog).getByText("Current splits", { selector: "summary" }),
+  );
   expect(
     within(dialog).getByRole("table", { name: "Current splits" }),
   ).toHaveTextContent("Alex");
@@ -231,7 +243,7 @@ it("requires an explicit visibility replacement and uses its dedicated endpoint"
   await actor.click(
     await screen.findByRole("button", { name: "Change visibility" }),
   );
-  await actor.click(screen.getByRole("radio", { name: "Private" }));
+  await choose(actor, "Visibility", "Private");
   await actor.click(screen.getByRole("checkbox", { name: "Bea" }));
   await actor.click(screen.getByRole("button", { name: "Save visibility" }));
   await waitFor(() =>
@@ -377,11 +389,11 @@ it("ignores a stale house response and clears the old house form", async () => {
 });
 it("renders paid, owed, net and suggested settlements without payment mutations", async () => {
   show(Balances);
-  const table = await screen.findByRole("table", { name: "Balances" });
-  expect(table).toHaveTextContent("Paid");
-  expect(table).toHaveTextContent("Owed");
-  expect(table).toHaveTextContent("Net");
-  expect(table).toHaveTextContent("-$5.00");
+  const cards = await screen.findAllByRole("article");
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toHaveTextContent("AlexPaid $10.00; owed $5.00; net $5.00");
+  expect(cards[1]).toHaveTextContent("BeaPaid $0.00; owed $5.00; net -$5.00");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(screen.getByText("Bea pays Alex $5.00")).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /pay|settle/i }),
@@ -395,6 +407,9 @@ it("requires replacement splits for changed amounts and submits an equal replace
     await screen.findByRole("button", { name: "Details / edit" }),
   );
   const dialog = await screen.findByRole("dialog");
+  await actor.click(
+    within(dialog).getByText("More options", { selector: "summary" }),
+  );
   await actor.clear(within(dialog).getByLabelText("Amount"));
   await actor.type(within(dialog).getByLabelText("Amount"), "20.01");
   await actor.click(
@@ -406,7 +421,7 @@ it("requires replacement splits for changed amounts and submits an equal replace
   expect(
     vi.mocked(api).mock.calls.some(([, init]) => init?.method === "PUT"),
   ).toBe(false);
-  await actor.click(within(dialog).getByRole("radio", { name: "Equal split" }));
+  await choose(actor, "Custom splits", "Equal split");
   await actor.click(
     within(dialog).getByRole("button", { name: "Save changes" }),
   );
@@ -432,9 +447,9 @@ it("clears private recipients from the payload after switching back to shared", 
   await actor.click(await screen.findByRole("button", { name: "Add expense" }));
   await actor.type(screen.getByLabelText("Amount"), "10");
   await actor.type(screen.getByLabelText("Description"), "Dinner");
-  await actor.click(screen.getByRole("radio", { name: "Private" }));
+  await choose(actor, "Visibility", "Private");
   await actor.click(screen.getByRole("checkbox", { name: "Mo" }));
-  await actor.click(screen.getByRole("radio", { name: "Shared" }));
+  await choose(actor, "Visibility", "Shared");
   await actor.click(screen.getByRole("button", { name: "Save expense" }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith(
@@ -524,7 +539,7 @@ it("recovers balances with retry after a failed request", async () => {
   failed = false;
   await actor.click(screen.getByRole("button", { name: "Retry" }));
   expect(
-    await screen.findByRole("table", { name: "Balances" }),
+    await screen.findByRole("heading", { name: "Alex" }),
   ).toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
@@ -534,11 +549,11 @@ it("uses the selected language and currency for finances", async () => {
     JSON.stringify({ language: "pt", currency: "BRL" }),
   );
   show(Balances);
-  const table = await screen.findByRole("table", { name: "Saldos" });
-  expect(table).toHaveTextContent("Pago");
-  expect(table).toHaveTextContent("Devido");
-  expect(table).toHaveTextContent("R$");
-  expect(screen.getByText("Acertos sugeridos")).toBeInTheDocument();
+  const cards = await screen.findAllByRole("article");
+  expect(cards[0]).toHaveTextContent("Pagou R$");
+  expect(cards[0]).toHaveTextContent("deve R$");
+  expect(cards[0]).toHaveTextContent("líquido R$");
+  expect(screen.getByText(/Bea paga Alex R\$/)).toBeInTheDocument();
 });
 it("preserves an unsaved expense draft while reviewing visibility settings", async () => {
   const actor = userEvent.setup();
@@ -575,7 +590,7 @@ it("preserves selected recipients after a failed visibility change", async () =>
   await actor.click(
     await screen.findByRole("button", { name: "Change visibility" }),
   );
-  await actor.click(screen.getByRole("radio", { name: "Private" }));
+  await choose(actor, "Visibility", "Private");
   await actor.click(screen.getByRole("checkbox", { name: "Bea" }));
   await actor.click(screen.getByRole("button", { name: "Save visibility" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Sharing denied");
@@ -602,6 +617,9 @@ it("removes editing controls immediately when a role becomes monitor", async () 
   expect(
     screen.queryByRole("button", { name: "Change visibility" }),
   ).not.toBeInTheDocument();
+  await actor.click(
+    screen.getByText("Current splits", { selector: "summary" }),
+  );
   expect(
     screen.getByRole("table", { name: "Current splits" }),
   ).toBeInTheDocument();

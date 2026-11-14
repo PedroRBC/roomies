@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import type { Expense, Member } from "@/lib/api";
 import { api } from "@/lib/api";
 import { housePath } from "@/lib/features";
@@ -6,7 +6,14 @@ import type { FeatureProps } from "@/lib/features";
 import { usePreferences } from "@/lib/preferences";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   canCreate,
   canMutate,
@@ -54,25 +61,33 @@ export function VisibilityFields({
   const { t } = usePreferences();
   const id = useId();
   return (
-    <fieldset disabled={disabled} className="grid gap-3">
-      <legend className="mb-2 font-medium">
-        {t("Visibility", "Visibilidade", "Visibilidad")}
-      </legend>
-      <RadioGroup
-        value={visibility}
-        onValueChange={(value) => onVisibility(value as "shared" | "private")}
-        aria-label={t("Visibility", "Visibilidade", "Visibilidad")}
-        disabled={disabled}
-      >
-        <label className="flex items-center gap-3" htmlFor={`${id}-shared`}>
-          <RadioGroupItem id={`${id}-shared`} value="shared" />
-          {t("Shared", "Compartilhada", "Compartido")}
-        </label>
-        <label className="flex items-center gap-3" htmlFor={`${id}-private`}>
-          <RadioGroupItem id={`${id}-private`} value="private" />
-          {t("Private", "Privada", "Privado")}
-        </label>
-      </RadioGroup>
+    <fieldset disabled={disabled} className="grid gap-2.5">
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${id}-visibility`} className="text-base font-semibold">
+          {t("Visibility", "Visibilidade", "Visibilidad")}
+        </Label>
+        <Select
+          value={visibility}
+          onValueChange={(value) => onVisibility(value as "shared" | "private")}
+          disabled={disabled}
+        >
+          <SelectTrigger id={`${id}-visibility`} className="w-full">
+            <SelectValue>
+              {visibility === "private"
+                ? t("Private", "Privada", "Privado")
+                : t("Shared", "Compartilhada", "Compartido")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="shared">
+              {t("Shared", "Compartilhada", "Compartido")}
+            </SelectItem>
+            <SelectItem value="private">
+              {t("Private", "Privada", "Privado")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       {visibility === "private" && (
         <fieldset className="grid gap-3">
           <legend className="mb-2 font-medium">
@@ -116,11 +131,13 @@ export function ExpenseForm(
     detail?: FinanceExpenseDetail;
     onSaved: () => void;
     onBusy?: (value: boolean) => void;
+    onClose?: () => void;
   },
 ) {
   const { t, money } = usePreferences();
   const validation = useExpenseValidation();
   const original = props.detail?.expense;
+  const Fields = original ? "details" : Fragment;
   const eligible = props.members.filter((member) => member.role !== "monitor");
   const [draft, setDraft] = useState<ExpenseDraft>(() => ({
     amount: original?.amount.toFixed(2) ?? "",
@@ -152,7 +169,7 @@ export function ExpenseForm(
   return (
     <form
       noValidate
-      className="grid gap-4"
+      className="grid gap-2.5"
       onSubmit={async (event) => {
         event.preventDefault();
         if (!permitted || action.busy) return;
@@ -183,135 +200,194 @@ export function ExpenseForm(
         if (saved) props.onSaved();
       }}
     >
-      <fieldset disabled={action.busy || !permitted} className="grid gap-4">
-        <FinanceField
-          label={t("Amount", "Valor", "Importe")}
-          value={draft.amount}
-          onChange={(event) => set("amount", event.target.value)}
-          inputMode="decimal"
-          required
-        />
-        <FinanceField
-          label={t("Description", "Descrição", "Descripción")}
-          value={draft.description}
-          onChange={(event) => set("description", event.target.value)}
-          required
-        />
-        <FinanceField
-          label={t(
-            "Category (optional)",
-            "Categoria (opcional)",
-            "Categoría (opcional)",
+      {original && (
+        <>
+          <FinanceField
+            label={t("Description", "Descrição", "Descripción")}
+            value={draft.description}
+            onChange={(event) => set("description", event.target.value)}
+            disabled={action.busy || !permitted}
+            required
+          />
+          <p className="text-muted-foreground">
+            {t("Active members", "Membros ativos", "Miembros activos")}:{" "}
+            {props.members.map((member) => member.user_id).join(", ")}
+          </p>
+        </>
+      )}
+      <Fields>
+        {original && (
+          <summary className="cursor-pointer py-2 font-semibold text-primary">
+            {t("More options", "Mais opções", "Más opciones")}
+          </summary>
+        )}
+        <fieldset disabled={action.busy || !permitted} className="grid gap-2.5">
+          <FinanceField
+            label={t("Amount", "Valor", "Importe")}
+            value={draft.amount}
+            onChange={(event) => set("amount", event.target.value)}
+            inputMode="decimal"
+            required
+          />
+          {!original && (
+            <FinanceField
+              label={t("Description", "Descrição", "Descripción")}
+              value={draft.description}
+              onChange={(event) => set("description", event.target.value)}
+              required
+            />
           )}
-          value={draft.category}
-          onChange={(event) => set("category", event.target.value)}
-        />
-        <FinanceField
-          label={t("Date", "Data", "Fecha")}
-          type="date"
-          value={draft.date}
-          onChange={(event) => set("date", event.target.value)}
-          required
-        />
-        <fieldset className="grid gap-3">
-          <legend className="mb-2 font-medium">
-            {t("Split", "Divisão", "Reparto")}
-          </legend>
-          <RadioGroup
-            value={draft.splitMode}
-            onValueChange={(value) =>
-              set("splitMode", value as ExpenseDraft["splitMode"])
-            }
-            disabled={action.busy}
-            aria-label={t("Split", "Divisão", "Reparto")}
-          >
-            {original && (
-              <label className="flex items-center gap-3" htmlFor={`${id}-keep`}>
-                <RadioGroupItem id={`${id}-keep`} value="keep" />
+          <fieldset className="grid gap-2.5">
+            <div className="grid gap-1.5">
+              <Label
+                htmlFor={`${id}-split`}
+                className="text-base font-semibold"
+              >
                 {t(
-                  "Keep current splits",
-                  "Manter divisão atual",
-                  "Mantener reparto actual",
+                  "Custom splits",
+                  "Divisão personalizada",
+                  "División personalizada",
                 )}
-              </label>
-            )}
-            <label className="flex items-center gap-3" htmlFor={`${id}-equal`}>
-              <RadioGroupItem id={`${id}-equal`} value="equal" />
-              {t("Equal split", "Divisão igual", "Reparto igual")}
-            </label>
-            <label className="flex items-center gap-3" htmlFor={`${id}-custom`}>
-              <RadioGroupItem id={`${id}-custom`} value="custom" />
-              {t(
-                "Custom splits",
-                "Divisão personalizada",
-                "Reparto personalizado",
-              )}
-            </label>
-          </RadioGroup>
-          {draft.splitMode === "equal" && (
-            <p className="text-sm text-muted-foreground">
-              {t(
-                "Split equally between current members, excluding monitors. Remaining cents go to the first members.",
-                "Divisão igual entre os membros atuais, exceto monitores. Os centavos restantes vão para os primeiros membros.",
-                "Reparto igual entre los miembros actuales, excepto monitores. Los céntimos restantes van a los primeros miembros.",
-              )}
-            </p>
-          )}
-          {draft.splitMode === "custom" && (
-            <div className="grid gap-3">
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  "Leave a share blank to exclude that member.",
-                  "Deixe uma parte em branco para excluir o membro da divisão.",
-                  "Deja una parte en blanco para excluir al miembro del reparto.",
-                )}
-              </p>
-              {eligible.map((member) => (
-                <FinanceField
-                  key={member.user_id}
-                  label={t(
-                    `Share for ${member.user_name}`,
-                    `Parte de ${member.user_name}`,
-                    `Parte de ${member.user_name}`,
+              </Label>
+              <Select
+                value={draft.splitMode}
+                onValueChange={(value) =>
+                  set("splitMode", value as ExpenseDraft["splitMode"])
+                }
+                disabled={action.busy}
+              >
+                <SelectTrigger id={`${id}-split`} className="w-full">
+                  <SelectValue>
+                    {draft.splitMode === "keep"
+                      ? t(
+                          "Keep current splits",
+                          "Manter divisão atual",
+                          "Mantener reparto actual",
+                        )
+                      : draft.splitMode === "equal"
+                        ? t("Equal split", "Divisão igual", "Reparto igual")
+                        : t(
+                            "Custom splits",
+                            "Divisão personalizada",
+                            "División personalizada",
+                          )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {original && (
+                    <SelectItem value="keep">
+                      {t(
+                        "Keep current splits",
+                        "Manter divisão atual",
+                        "Mantener reparto actual",
+                      )}
+                    </SelectItem>
                   )}
-                  inputMode="decimal"
-                  value={draft.shares[member.user_id] ?? ""}
-                  onChange={(event) =>
-                    set("shares", {
-                      ...draft.shares,
-                      [member.user_id]: event.target.value,
-                    })
-                  }
-                />
-              ))}
-              <p>
-                {t("Split total", "Total da divisão", "Total del reparto")}:{" "}
-                {money(totalShares / 100)}
-              </p>
+                  <SelectItem value="equal">
+                    {t("Equal split", "Divisão igual", "Reparto igual")}
+                  </SelectItem>
+                  <SelectItem value="custom">
+                    {t(
+                      "Custom splits",
+                      "Divisão personalizada",
+                      "División personalizada",
+                    )}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {draft.splitMode === "custom" && (
+              <div className="grid gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    "Leave a share blank to exclude that member.",
+                    "Deixe uma parte em branco para excluir o membro da divisão.",
+                    "Deja una parte en blanco para excluir al miembro del reparto.",
+                  )}
+                </p>
+                {eligible.map((member) => (
+                  <FinanceField
+                    key={member.user_id}
+                    label={t(
+                      `Share for ${member.user_name}`,
+                      `Parte de ${member.user_name}`,
+                      `Parte de ${member.user_name}`,
+                    )}
+                    inputMode="decimal"
+                    value={draft.shares[member.user_id] ?? ""}
+                    onChange={(event) =>
+                      set("shares", {
+                        ...draft.shares,
+                        [member.user_id]: event.target.value,
+                      })
+                    }
+                  />
+                ))}
+                <p>
+                  {t("Split total", "Total da divisão", "Total del reparto")}:{" "}
+                  {money(totalShares / 100)}
+                </p>
+              </div>
+            )}
+          </fieldset>
+          <FinanceField
+            label={t(
+              "Category (optional)",
+              "Categoria (opcional)",
+              "Categoría (opcional)",
+            )}
+            value={draft.category}
+            onChange={(event) => set("category", event.target.value)}
+          />
+          <FinanceField
+            label={t("Date", "Data", "Fecha")}
+            type="date"
+            value={draft.date}
+            onChange={(event) => set("date", event.target.value)}
+            required
+          />
+          {!original && (
+            <VisibilityFields
+              visibility={draft.visibility}
+              recipients={draft.recipients}
+              members={props.members.filter(
+                (member) => member.user_id !== props.user.id,
+              )}
+              onVisibility={(value) => set("visibility", value)}
+              onRecipients={(value) => set("recipients", value)}
+              disabled={action.busy}
+            />
           )}
         </fieldset>
-        {!original && (
-          <VisibilityFields
-            visibility={draft.visibility}
-            recipients={draft.recipients}
-            members={props.members.filter(
-              (member) => member.user_id !== props.user.id,
-            )}
-            onVisibility={(value) => set("visibility", value)}
-            onRecipients={(value) => set("recipients", value)}
-            disabled={action.busy}
-          />
-        )}
-      </fieldset>
+      </Fields>
       <FinanceError error={action.error} />
-      <Button type="submit" disabled={action.busy || !permitted}>
-        {action.busy
-          ? t("Saving…", "Salvando…", "Guardando…")
-          : original
-            ? t("Save changes", "Salvar alterações", "Guardar cambios")
-            : t("Save expense", "Salvar despesa", "Guardar gasto")}
-      </Button>
+      <div
+        className={original ? "flex flex-wrap justify-end gap-2 pt-2" : "py-2"}
+      >
+        <Button
+          type="submit"
+          variant={original ? "ghost" : "default"}
+          className={original ? "text-primary" : "h-12 w-full"}
+          disabled={action.busy || !permitted}
+        >
+          {action.busy
+            ? t("Saving…", "Salvando…", "Guardando…")
+            : original
+              ? t("Save changes", "Salvar alterações", "Guardar cambios")
+              : t("Save expense", "Salvar despesa", "Guardar gasto")}
+        </Button>
+        {original && props.onClose && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-primary"
+            disabled={action.busy}
+            onClick={props.onClose}
+          >
+            {t("Close", "Fechar", "Cerrar")}
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
@@ -380,7 +456,7 @@ export function ExpenseVisibility(
         disabled={action.busy}
       />
       <FinanceError error={action.error} />
-      <Button disabled={action.busy} type="submit">
+      <Button className="my-2 h-12 w-full" disabled={action.busy} type="submit">
         {action.busy
           ? t("Saving…", "Salvando…", "Guardando…")
           : t("Save visibility", "Salvar visibilidade", "Guardar visibilidad")}

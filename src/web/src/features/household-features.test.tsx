@@ -154,6 +154,7 @@ it("preserves grocery fields on failure and creates with all fields on retry", a
   const actor = userEvent.setup();
   render(view(Groceries));
   await actor.type(await screen.findByLabelText("Name"), "Bread");
+  await actor.click(screen.getByText("More options", { selector: "summary" }));
   await actor.type(screen.getByLabelText("Quantity"), "2");
   await actor.type(screen.getByLabelText("Unit"), "loaves");
   await actor.type(screen.getByLabelText("Note"), "Whole grain");
@@ -399,9 +400,10 @@ it("creates a chore using wall-clock time, recurrence and exception dates withou
   const actor = userEvent.setup();
   render(view(Chores));
   await actor.type(await screen.findByLabelText("Title"), "Water plants");
-  fireEvent.change(screen.getByLabelText("Due (local time)"), {
+  fireEvent.change(screen.getByLabelText("Due local"), {
     target: { value: "2026-11-20T08:30" },
   });
+  await actor.click(screen.getByText("More options", { selector: "summary" }));
   await actor.clear(screen.getByLabelText("Timezone"));
   await actor.type(screen.getByLabelText("Timezone"), "America/Sao_Paulo");
   await actor.clear(screen.getByLabelText("Recurrence (RRULE)"));
@@ -444,9 +446,10 @@ it("locks custom form controls while a chore save is pending", async () => {
   const actor = userEvent.setup();
   render(view(Chores));
   await actor.type(await screen.findByLabelText("Title"), "Clean");
-  fireEvent.change(screen.getByLabelText("Due (local time)"), {
+  fireEvent.change(screen.getByLabelText("Due local"), {
     target: { value: "2026-11-20T08:30" },
   });
+  await actor.click(screen.getByText("More options", { selector: "summary" }));
   await actor.click(screen.getByRole("button", { name: "Create chore" }));
   await actor.click(screen.getByRole("checkbox", { name: "Enabled" }));
   expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeChecked();
@@ -458,17 +461,17 @@ it("defaults the calendar end one hour later and rejects reversed ranges without
   fireEvent.change(await screen.findByLabelText("Title"), {
     target: { value: "Dinner" },
   });
-  fireEvent.change(screen.getByLabelText("Start (local time)"), {
+  fireEvent.change(screen.getByLabelText("Start local"), {
     target: { value: "2026-12-31T23:30" },
   });
-  expect(screen.getByLabelText("End (local time)")).toHaveValue(
-    "2027-01-01T00:30",
-  );
-  fireEvent.change(screen.getByLabelText("End (local time)"), {
+  expect(screen.getByLabelText("End local")).toHaveValue("2027-01-01T00:30");
+  fireEvent.change(screen.getByLabelText("End local"), {
     target: { value: "2026-12-31T22:00" },
   });
   fireEvent.submit(
-    screen.getByRole("button", { name: "Create event" }).closest("form")!,
+    screen
+      .getByRole("button", { name: "Create calendar event" })
+      .closest("form")!,
   );
   expect(await screen.findByRole("alert")).toHaveTextContent(
     /end.*after.*start/i,
@@ -484,12 +487,15 @@ it("sends all-day calendar dates as local midnight, with an exclusive end", asyn
   const actor = userEvent.setup();
   render(view(Calendar));
   await actor.type(await screen.findByLabelText("Title"), "Holiday");
+  await actor.click(screen.getByText("More options", { selector: "summary" }));
   await actor.click(screen.getByRole("checkbox", { name: "All day" }));
-  fireEvent.change(screen.getByLabelText("Start (local time)"), {
+  fireEvent.change(screen.getByLabelText("Start local"), {
     target: { value: "2026-11-20" },
   });
-  expect(screen.getByLabelText("End (local time)")).toHaveValue("2026-11-21");
-  await actor.click(screen.getByRole("button", { name: "Create event" }));
+  expect(screen.getByLabelText("End local")).toHaveValue("2026-11-21");
+  await actor.click(
+    screen.getByRole("button", { name: "Create calendar event" }),
+  );
   expect(api).toHaveBeenCalledWith(
     "/houses/our%20house/calendar",
     expect.objectContaining({
@@ -516,8 +522,9 @@ it("retains the calendar draft after backend recurrence validation fails", async
   const actor = userEvent.setup();
   render(view(Calendar));
   await actor.type(await screen.findByLabelText("Title"), "Dinner");
+  await actor.click(screen.getByText("More options", { selector: "summary" }));
   await actor.type(screen.getByLabelText("Description"), "Bring dessert");
-  fireEvent.change(screen.getByLabelText("Start (local time)"), {
+  fireEvent.change(screen.getByLabelText("Start local"), {
     target: { value: "2026-11-20T18:00" },
   });
   await actor.clear(screen.getByLabelText("Recurrence (RRULE)"));
@@ -525,13 +532,13 @@ it("retains the calendar draft after backend recurrence validation fails", async
     screen.getByLabelText("Recurrence (RRULE)"),
     "FREQ=WEEKLY;UNTIL=invalid",
   );
-  await actor.click(screen.getByRole("button", { name: "Create event" }));
+  await actor.click(
+    screen.getByRole("button", { name: "Create calendar event" }),
+  );
   expect(await screen.findByRole("alert")).toHaveTextContent(/recurrence/i);
   expect(screen.getByLabelText("Title")).toHaveValue("Dinner");
   expect(screen.getByLabelText("Description")).toHaveValue("Bring dessert");
-  expect(screen.getByLabelText("Start (local time)")).toHaveValue(
-    "2026-11-20T18:00",
-  );
+  expect(screen.getByLabelText("Start local")).toHaveValue("2026-11-20T18:00");
   expect(screen.getByLabelText("Recurrence (RRULE)")).toHaveValue(
     "FREQ=WEEKLY;UNTIL=invalid",
   );

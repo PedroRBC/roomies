@@ -2,14 +2,7 @@ import type { Balances as BalanceResponse } from "@/lib/api";
 import { housePath } from "@/lib/features";
 import type { FeatureProps } from "@/lib/features";
 import { usePreferences } from "@/lib/preferences";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { LoaderCircle } from "lucide-react";
 import { useFinanceResource } from "./finance-resource";
 import { FinanceError } from "./finance-ui";
 
@@ -25,73 +18,61 @@ function HouseBalances({ houseId, onUnauthorized }: FeatureProps) {
   return (
     <section
       aria-label={t("Balances", "Saldos", "Saldos")}
-      className="grid gap-5"
+      className="space-y-5"
     >
-      <h2 className="font-heading text-2xl">
+      <h2 className="roomies-page-title">
         {t("Balances", "Saldos", "Saldos")}
       </h2>
       <FinanceError error={error} retry={reload} />
       {loading ? (
-        <p role="status">
-          {t("Loading balances…", "Carregando saldos…", "Cargando saldos…")}
-        </p>
+        <div role="status" className="flex justify-center py-8">
+          <LoaderCircle
+            aria-hidden="true"
+            className="size-7 animate-spin text-primary"
+          />
+          <span className="sr-only">
+            {t("Loading balances…", "Carregando saldos…", "Cargando saldos…")}
+          </span>
+        </div>
       ) : (
         data &&
         (data.balances.length === 0 ? (
           <p>
             {t(
               "No expenses yet.",
-              "Ainda não há despesas.",
-              "Todavía no hay gastos.",
+              "Nenhuma despesa ainda.",
+              "Aún no hay gastos.",
             )}
           </p>
         ) : (
           <>
-            <Table aria-label={t("Balances", "Saldos", "Saldos")}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">
-                    {t("Member", "Membro", "Miembro")}
-                  </TableHead>
-                  <TableHead scope="col">
-                    {t("Paid", "Pago", "Pagado")}
-                  </TableHead>
-                  <TableHead scope="col">
-                    {t("Owed", "Devido", "Adeudado")}
-                  </TableHead>
-                  <TableHead scope="col">{t("Net", "Saldo", "Neto")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.balances.map((entry) => (
-                  <TableRow key={entry.user_id}>
-                    <TableHead scope="row">{entry.user_name}</TableHead>
-                    <TableCell>{money(entry.paid)}</TableCell>
-                    <TableCell>{money(entry.owed)}</TableCell>
-                    <TableCell className="font-semibold">
-                      {money(entry.net)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {(data.settlements ?? []).length > 0 && (
-              <div className="grid gap-3">
-                <h3 className="font-heading text-lg">
-                  {t(
-                    "Suggested settlements",
-                    "Acertos sugeridos",
-                    "Liquidaciones sugeridas",
-                  )}
+            {data.balances.map((entry) => (
+              <article
+                key={entry.user_id}
+                className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)"
+              >
+                <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
+                  {entry.user_name}
                 </h3>
+                <p className="text-muted-foreground">
+                  {t(
+                    `Paid ${money(entry.paid)}; owed ${money(entry.owed)}; net ${money(entry.net)}`,
+                    `Pagou ${money(entry.paid)}; deve ${money(entry.owed)}; líquido ${money(entry.net)}`,
+                    `Pagó ${money(entry.paid)}; debe ${money(entry.owed)}; neto ${money(entry.net)}`,
+                  )}
+                </p>
+              </article>
+            ))}
+            {(data.settlements ?? []).length > 0 && (
+              <div className="grid gap-3 text-muted-foreground">
                 {data.settlements.map((settlement) => (
                   <p
                     key={`${settlement.from_user_id}:${settlement.to_user_id}`}
                   >
                     {t(
                       `${settlement.from_user_name} pays ${settlement.to_user_name} ${money(settlement.amount)}`,
-                      `${settlement.from_user_name} paga ${money(settlement.amount)} a ${settlement.to_user_name}`,
-                      `${settlement.from_user_name} paga ${money(settlement.amount)} a ${settlement.to_user_name}`,
+                      `${settlement.from_user_name} paga ${settlement.to_user_name} ${money(settlement.amount)}`,
+                      `${settlement.from_user_name} paga a ${settlement.to_user_name} ${money(settlement.amount)}`,
                     )}
                   </p>
                 ))}

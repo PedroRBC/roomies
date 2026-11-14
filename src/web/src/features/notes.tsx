@@ -6,12 +6,7 @@ import type { FeatureProps } from "@/lib/features";
 import { usePreferences } from "@/lib/preferences";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { financeDate, canCreate, canMutate } from "./finance-model";
 import { useFinanceAction, useFinanceResource } from "./finance-resource";
 import {
@@ -42,13 +37,15 @@ function NotesHouse(props: FeatureProps) {
   }
   return (
     <section aria-label={t("Notes", "Notas", "Notas")} className="grid gap-5">
-      <h2 className="font-heading text-2xl">{t("Notes", "Notas", "Notas")}</h2>
+      <h2 className="roomies-page-title">{t("Notes", "Notas", "Notas")}</h2>
       {canCreate(props.role) ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("New note", "Nova nota", "Nueva nota")}</CardTitle>
+        <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
+          <CardHeader className="px-5">
+            <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
+              <h3>{t("New note", "Nova nota", "Nueva nota")}</h3>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-5">
             <NoteForm {...props} onSaved={changed} />
           </CardContent>
         </Card>
@@ -67,33 +64,39 @@ function NotesHouse(props: FeatureProps) {
           {t("Loading notes…", "Carregando notas…", "Cargando notas…")}
         </p>
       ) : resource.data?.length === 0 ? (
-        <p>
-          {t("No notes yet.", "Ainda não há notas.", "Todavía no hay notas.")}
-        </p>
+        <p>{t("No notes yet.", "Nenhuma nota ainda.", "Aún no hay notas.")}</p>
       ) : (
         resource.data?.map((note) => (
           <article key={note.id}>
-            <Card>
-              <CardHeader>
-                <CardTitle>
+            <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
+              <CardHeader className="px-5">
+                <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
                   <h3>{note.title}</h3>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3">
-                <p className="whitespace-pre-wrap break-words">
+              <CardContent className="px-5">
+                <p className="whitespace-pre-wrap break-words text-[15px] text-muted-foreground">
                   {note.content}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {t("By", "Por", "Por")} {note.author_name} ·{" "}
-                  {financeDate(note.updated_at, locale, true)}
+                  {t(
+                    `By ${note.author_name} · updated ${financeDate(note.updated_at, locale, true)}`,
+                    `Por ${note.author_name} · atualizado ${financeDate(note.updated_at, locale, true)}`,
+                    `Por ${note.author_name} · actualizado ${financeDate(note.updated_at, locale, true)}`,
+                  )}
                 </p>
                 {permitted(note) && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setEditing(note)}>
+                  <div className="flex flex-wrap justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="h-10 px-4"
+                      onClick={() => setEditing(note)}
+                    >
                       {t("Edit", "Editar", "Editar")}
                     </Button>
                     <Button
-                      variant="destructive"
+                      variant="ghost"
+                      className="h-10 px-4 text-destructive hover:text-destructive"
                       onClick={() => setDeleting(note)}
                     >
                       {t("Delete", "Excluir", "Eliminar")}
@@ -154,22 +157,13 @@ function NoteEditor(
     >
       <DialogContent
         showCloseButton={false}
+        aria-describedby={undefined}
         className="max-h-[85dvh] overflow-y-auto sm:max-w-lg"
       >
-        <DialogTitle>
+        <DialogTitle className="font-heading text-[22px] font-semibold leading-tight">
           {t("Edit note", "Editar nota", "Editar nota")}
         </DialogTitle>
-        <DialogDescription>
-          {t(
-            "Update this household note.",
-            "Atualize esta nota da casa.",
-            "Actualiza esta nota de la casa.",
-          )}
-        </DialogDescription>
         <NoteForm {...props} setBusy={setBusy} />
-        <Button variant="outline" disabled={busy} onClick={props.onClose}>
-          {t("Close", "Fechar", "Cerrar")}
-        </Button>
       </DialogContent>
     </Dialog>
   );
@@ -179,6 +173,7 @@ function NoteForm(
     note?: HouseNote;
     onSaved: () => void;
     setBusy?: (value: boolean) => void;
+    onClose?: () => void;
   },
 ) {
   const { t } = usePreferences();
@@ -191,7 +186,7 @@ function NoteForm(
   return (
     <form
       noValidate
-      className="grid gap-4"
+      className="grid gap-2.5"
       onSubmit={async (event) => {
         event.preventDefault();
         if (!allowed || action.busy) return;
@@ -239,15 +234,38 @@ function NoteForm(
         onChange={(event) => setContent(event.target.value)}
         disabled={action.busy}
         required
+        rows={5}
       />
       <FinanceError error={action.error} />
-      <Button type="submit" disabled={action.busy || !allowed}>
-        {action.busy
-          ? t("Saving…", "Salvando…", "Guardando…")
-          : props.note
-            ? t("Save changes", "Salvar alterações", "Guardar cambios")
-            : t("Save note", "Salvar nota", "Guardar nota")}
-      </Button>
+      <div
+        className={
+          props.note ? "flex flex-wrap justify-end gap-2 pt-2" : "py-2"
+        }
+      >
+        <Button
+          type="submit"
+          variant={props.note ? "ghost" : "default"}
+          className={props.note ? "text-primary" : "h-12 w-full"}
+          disabled={action.busy || !allowed}
+        >
+          {action.busy
+            ? t("Saving…", "Salvando…", "Guardando…")
+            : props.note
+              ? t("Save changes", "Salvar alterações", "Guardar cambios")
+              : t("Save note", "Salvar nota", "Guardar nota")}
+        </Button>
+        {props.note && props.onClose && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-primary"
+            disabled={action.busy}
+            onClick={props.onClose}
+          >
+            {t("Close", "Fechar", "Cerrar")}
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

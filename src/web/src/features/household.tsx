@@ -254,8 +254,10 @@ function Field({
 }) {
   const id = useId();
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="grid gap-1.5">
+      <Label htmlFor={id} className="text-base font-semibold">
+        {label}
+      </Label>
       {children(id)}
     </div>
   );
@@ -303,13 +305,17 @@ function Feedback({
 }) {
   const { t } = usePreferences();
   const failure = state.loadError ?? state.error;
+  if (!state.loading && failure == null && !state.status) return null;
   return (
     <div className="space-y-2">
       {state.loading && (
         <p role="status">{t("Loading…", "Carregando…", "Cargando…")}</p>
       )}
       {failure != null && (
-        <p role="alert" className="text-destructive">
+        <p
+          role="alert"
+          className="rounded-xl border border-destructive/35 bg-destructive/10 p-3.5 text-destructive"
+        >
           {errorMessage(failure, t)}
         </p>
       )}
@@ -365,7 +371,7 @@ function DeleteConfirmation({
       }}
     >
       <AlertDialogContent>
-        <AlertDialogTitle>
+        <AlertDialogTitle className="font-heading text-[22px] font-semibold leading-tight">
           {t("Delete", "Excluir", "Eliminar")} “{name}”?
         </AlertDialogTitle>
         <AlertDialogDescription>
@@ -376,7 +382,10 @@ function DeleteConfirmation({
           )}
         </AlertDialogDescription>
         {error != null && (
-          <p role="alert" className="text-destructive">
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/35 bg-destructive/10 p-3.5 text-destructive"
+          >
             {errorMessage(error, t)}
           </p>
         )}
@@ -386,7 +395,8 @@ function DeleteConfirmation({
           </AlertDialogCancel>
           <Button
             type="button"
-            variant="destructive"
+            variant="ghost"
+            className="h-10 px-4 text-destructive hover:text-destructive"
             disabled={disabled}
             onClick={onDelete}
           >
@@ -464,36 +474,43 @@ function GroceriesPanel(props: FeatureProps) {
       className="space-y-5"
       aria-label={t("Groceries", "Compras", "Compras")}
     >
-      <h2 className="font-heading text-2xl">
+      <h2 className="roomies-page-title">
         {t("Groceries", "Compras", "Compras")}
       </h2>
       <Feedback state={{ ...state, error: selected ? null : state.error }} />
       {!canWrite && <ReadOnly />}
       {canWrite && (
-        <form onSubmit={create} className="rounded-xl border bg-card p-5">
-          <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={create}>
+          <fieldset disabled={disabled} className="grid gap-2.5">
             <Field label={t("Name", "Nome", "Nombre")}>
               {(id) => <Input id={id} name="name" required maxLength={160} />}
             </Field>
-            <Assignee
-              members={props.members}
-              value={assignee}
-              onChange={setAssignee}
-            />
-            <Field label={t("Quantity", "Quantidade", "Cantidad")}>
-              {(id) => <Input id={id} name="quantity" maxLength={40} />}
-            </Field>
-            <Field label={t("Unit", "Unidade", "Unidad")}>
-              {(id) => <Input id={id} name="unit" maxLength={40} />}
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label={t("Note", "Observação", "Nota")}>
-                {(id) => (
-                  <Textarea id={id} name="note" maxLength={1000} rows={2} />
-                )}
-              </Field>
-            </div>
-            <Button type="submit" className="justify-self-start">
+            <details>
+              <summary className="cursor-pointer py-2 font-semibold text-primary">
+                {t("More options", "Mais opções", "Más opciones")}
+              </summary>
+              <div className="grid gap-2.5 pt-2">
+                <Assignee
+                  members={props.members}
+                  value={assignee}
+                  onChange={setAssignee}
+                />
+                <Field label={t("Quantity", "Quantidade", "Cantidad")}>
+                  {(id) => <Input id={id} name="quantity" maxLength={40} />}
+                </Field>
+                <Field label={t("Unit", "Unidade", "Unidad")}>
+                  {(id) => <Input id={id} name="unit" maxLength={40} />}
+                </Field>
+                <div>
+                  <Field label={t("Note", "Observação", "Nota")}>
+                    {(id) => (
+                      <Textarea id={id} name="note" maxLength={1000} rows={2} />
+                    )}
+                  </Field>
+                </div>
+              </div>
+            </details>
+            <Button type="submit" className="my-2 h-12 w-full">
               {t("Add grocery", "Adicionar item", "Añadir producto")}
             </Button>
           </fieldset>
@@ -503,49 +520,60 @@ function GroceriesPanel(props: FeatureProps) {
         <p className="text-muted-foreground">
           {t(
             "No groceries yet.",
-            "Ainda não há itens na lista.",
-            "Todavía no hay productos.",
+            "Nenhuma compra ainda.",
+            "Aún no hay compras.",
           )}
         </p>
       )}
-      <ul className="grid gap-3">
+      <ul className="grid gap-5">
         {state.items.map((item) => (
           <li key={item.id}>
-            <article className="space-y-3 rounded-xl border bg-card p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h3
-                  className={`font-heading text-lg ${item.checked ? "line-through text-muted-foreground" : ""}`}
-                >
-                  {item.name}
-                </h3>
-                <p className="text-sm">
-                  {item.checked
-                    ? t("Checked", "Comprado", "Comprado")
-                    : t("Needed", "Pendente", "Pendiente")}
-                </p>
-              </div>
-              {(item.quantity || item.unit) && (
-                <p>{[item.quantity, item.unit].filter(Boolean).join(" ")}</p>
-              )}
-              {item.note && (
-                <p className="whitespace-pre-wrap break-words text-muted-foreground">
-                  {item.note}
-                </p>
-              )}
-              {item.assignee_id && (
-                <p className="text-sm">
-                  {t("Assignee", "Responsável", "Responsable")}:{" "}
-                  {props.members.find(
-                    (member) => member.user_id === item.assignee_id,
-                  )?.user_name ??
-                    t("Former member", "Ex-membro", "Antiguo miembro")}
-                </p>
+            <article className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)">
+              <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
+                {item.name}
+              </h3>
+              <p className="text-[15px] text-muted-foreground">
+                {item.checked
+                  ? t("Checked", "Marcado", "Marcado")
+                  : t("Needed", "Pendente", "Pendiente")}
+              </p>
+              {(item.quantity ||
+                item.unit ||
+                item.note ||
+                item.assignee_id) && (
+                <details className="mt-2 text-muted-foreground">
+                  <summary className="cursor-pointer py-2 text-sm">
+                    {t("Details", "Detalhes", "Detalles")}
+                  </summary>
+                  <div className="space-y-2">
+                    {(item.quantity || item.unit) && (
+                      <p>
+                        {[item.quantity, item.unit].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                    {item.note && (
+                      <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                        {item.note}
+                      </p>
+                    )}
+                    {item.assignee_id && (
+                      <p className="text-sm">
+                        {t("Assignee", "Responsável", "Responsable")}:{" "}
+                        {props.members.find(
+                          (member) => member.user_id === item.assignee_id,
+                        )?.user_name ??
+                          t("Former member", "Ex-membro", "Antiguo miembro")}
+                      </p>
+                    )}
+                  </div>
+                </details>
               )}
               {canWrite && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="h-10 px-4"
                     disabled={disabled}
                     onClick={() =>
                       void state.mutate(() =>
@@ -568,7 +596,8 @@ function GroceriesPanel(props: FeatureProps) {
                   </Button>
                   <Button
                     type="button"
-                    variant="destructive"
+                    variant="ghost"
+                    className="h-10 px-4 text-destructive hover:text-destructive"
                     disabled={disabled}
                     onClick={() => {
                       state.setError(null);
@@ -648,7 +677,7 @@ function ScheduleFields() {
           )}
         </p>
       </div>
-      <div className="grid gap-2 sm:col-span-2">
+      <div className="grid gap-2">
         <Field
           label={t(
             "Exception dates",
@@ -793,58 +822,20 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
   }
   return (
     <section className="space-y-5" aria-label={title}>
-      <h2 className="font-heading text-2xl">{title}</h2>
+      <h2 className="roomies-page-title">{title}</h2>
       <Feedback state={{ ...state, error: selected ? null : state.error }} />
       {!canWrite && <ReadOnly />}
       {canWrite && (
-        <form onSubmit={create} className="rounded-xl border bg-card p-5">
-          <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={create}>
+          <fieldset disabled={disabled} className="grid gap-2.5">
             <Field label={t("Title", "Título", "Título")}>
               {(id) => <Input id={id} name="title" required maxLength={160} />}
             </Field>
-            {isChore ? (
-              <Assignee
-                members={props.members}
-                value={assignee}
-                onChange={setAssignee}
-              />
-            ) : (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={allDayId}
-                  checked={allDay}
-                  onCheckedChange={(checked) => changeAllDay(checked === true)}
-                />
-                <Label htmlFor={allDayId}>
-                  {t("All day", "Dia inteiro", "Todo el día")}
-                </Label>
-              </div>
-            )}
-            <div className="sm:col-span-2">
-              <Field label={t("Description", "Descrição", "Descripción")}>
-                {(id) => (
-                  <Textarea
-                    id={id}
-                    name="description"
-                    rows={2}
-                    maxLength={4000}
-                  />
-                )}
-              </Field>
-            </div>
             <Field
               label={
                 isChore
-                  ? t(
-                      "Due (local time)",
-                      "Prazo (hora local)",
-                      "Vencimiento (hora local)",
-                    )
-                  : t(
-                      "Start (local time)",
-                      "Início (hora local)",
-                      "Inicio (hora local)",
-                    )
+                  ? t("Due local", "Vencimento local", "Vencimiento local")
+                  : t("Start local", "Início local", "Inicio local")
               }
             >
               {(id) => (
@@ -859,13 +850,7 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
               )}
             </Field>
             {!isChore && (
-              <Field
-                label={t(
-                  "End (local time)",
-                  "Fim (hora local)",
-                  "Final (hora local)",
-                )}
-              >
+              <Field label={t("End local", "Fim local", "Fin local")}>
                 {(id) => (
                   <Input
                     id={id}
@@ -879,7 +864,7 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
               </Field>
             )}
             {!isChore && allDay && (
-              <p className="text-xs text-muted-foreground sm:col-span-2">
+              <p className="text-xs text-muted-foreground">
                 {t(
                   "End is exclusive: a one-day event ends on the following date.",
                   "O fim é exclusivo: um evento de um dia termina na data seguinte.",
@@ -887,23 +872,64 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
                 )}
               </p>
             )}
-            <ScheduleFields />
-            {isChore && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={enabledId}
-                  checked={enabled}
-                  onCheckedChange={(checked) => setEnabled(checked === true)}
-                />
-                <Label htmlFor={enabledId}>
-                  {t("Enabled", "Ativa", "Activa")}
-                </Label>
+            <details>
+              <summary className="cursor-pointer py-2 font-semibold text-primary">
+                {t("More options", "Mais opções", "Más opciones")}
+              </summary>
+              <div className="grid gap-2.5 pt-2">
+                {isChore ? (
+                  <Assignee
+                    members={props.members}
+                    value={assignee}
+                    onChange={setAssignee}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={allDayId}
+                      checked={allDay}
+                      onCheckedChange={(checked) =>
+                        changeAllDay(checked === true)
+                      }
+                    />
+                    <Label htmlFor={allDayId}>
+                      {t("All day", "Dia inteiro", "Todo el día")}
+                    </Label>
+                  </div>
+                )}
+                <div>
+                  <Field label={t("Description", "Descrição", "Descripción")}>
+                    {(id) => (
+                      <Textarea
+                        id={id}
+                        name="description"
+                        rows={2}
+                        maxLength={4000}
+                      />
+                    )}
+                  </Field>
+                </div>
+                <ScheduleFields />
+                {isChore && (
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={enabledId}
+                      checked={enabled}
+                      onCheckedChange={(checked) =>
+                        setEnabled(checked === true)
+                      }
+                    />
+                    <Label htmlFor={enabledId}>
+                      {t("Enabled", "Ativa", "Activa")}
+                    </Label>
+                  </div>
+                )}
               </div>
-            )}
-            <Button type="submit" className="justify-self-start sm:col-span-2">
+            </details>
+            <Button type="submit" className="my-2 h-12 w-full">
               {isChore
                 ? t("Create chore", "Criar tarefa", "Crear tarea")
-                : t("Create event", "Criar evento", "Crear evento")}
+                : t("Create calendar event", "Criar evento", "Crear evento")}
             </Button>
           </fieldset>
         </form>
@@ -923,85 +949,96 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
               )}
         </p>
       )}
-      <ul className="grid gap-3">
+      <ul className="grid gap-5">
         {state.items.map((item) => (
           <li key={item.id}>
-            <article className="space-y-3 rounded-xl border bg-card p-5">
-              <h3 className="font-heading text-lg">{item.title}</h3>
-              {item.description && (
-                <p className="whitespace-pre-wrap break-words text-muted-foreground">
-                  {item.description}
-                </p>
-              )}
-              {"due_local" in item ? (
-                <>
-                  <p>
-                    <time dateTime={item.due_local}>
-                      {item.due_local.replace("T", " ")}
-                    </time>{" "}
-                    · {item.timezone}
-                  </p>
-                  <p>
-                    {item.enabled
-                      ? t("Enabled", "Ativa", "Activa")
-                      : t("Disabled", "Desativada", "Desactivada")}
-                  </p>
-                  {item.assignee_id && (
-                    <p className="text-sm">
-                      {t("Assignee", "Responsável", "Responsable")}:{" "}
-                      {props.members.find(
-                        (member) => member.user_id === item.assignee_id,
-                      )?.user_name ??
-                        t("Former member", "Ex-membro", "Antiguo miembro")}
+            <article className="rounded-[18px] border bg-card p-5 shadow-(--card-shadow)">
+              <h3 className="mb-2 pt-2 text-[19px] font-bold leading-normal tracking-[-0.1px]">
+                {item.title}
+              </h3>
+              <details className="text-muted-foreground">
+                <summary className="cursor-pointer py-2 text-sm">
+                  {t("Details", "Detalhes", "Detalles")}
+                </summary>
+                <div className="space-y-2">
+                  {item.description && (
+                    <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                      {item.description}
                     </p>
                   )}
-                </>
-              ) : (
-                <>
-                  <p>
-                    <time dateTime={item.start_local}>
-                      {item.all_day
-                        ? item.start_local.slice(0, 10)
-                        : item.start_local.replace("T", " ")}
-                    </time>{" "}
-                    –{" "}
-                    <time dateTime={item.end_local}>
-                      {item.all_day
-                        ? item.end_local.slice(0, 10)
-                        : item.end_local.replace("T", " ")}
-                    </time>{" "}
-                    · {item.timezone}
-                  </p>
-                  {item.all_day && (
-                    <p className="text-sm">
-                      {t(
-                        "All day (end date excluded)",
-                        "Dia inteiro (data final excluída)",
-                        "Todo el día (fecha final excluida)",
+                  {"due_local" in item ? (
+                    <>
+                      <p>
+                        <time dateTime={item.due_local}>
+                          {item.due_local.replace("T", " ")}
+                        </time>{" "}
+                        · {item.timezone}
+                      </p>
+                      <p>
+                        {item.enabled
+                          ? t("Enabled", "Ativa", "Activa")
+                          : t("Disabled", "Desativada", "Desactivada")}
+                      </p>
+                      {item.assignee_id && (
+                        <p className="text-sm">
+                          {t("Assignee", "Responsável", "Responsable")}:{" "}
+                          {props.members.find(
+                            (member) => member.user_id === item.assignee_id,
+                          )?.user_name ??
+                            t("Former member", "Ex-membro", "Antiguo miembro")}
+                        </p>
                       )}
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        <time dateTime={item.start_local}>
+                          {item.all_day
+                            ? item.start_local.slice(0, 10)
+                            : item.start_local.replace("T", " ")}
+                        </time>{" "}
+                        –{" "}
+                        <time dateTime={item.end_local}>
+                          {item.all_day
+                            ? item.end_local.slice(0, 10)
+                            : item.end_local.replace("T", " ")}
+                        </time>{" "}
+                        · {item.timezone}
+                      </p>
+                      {item.all_day && (
+                        <p className="text-sm">
+                          {t(
+                            "All day (end date excluded)",
+                            "Dia inteiro (data final excluída)",
+                            "Todo el día (fecha final excluida)",
+                          )}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  <p className="break-all text-sm text-muted-foreground">
+                    {t("Recurrence", "Recorrência", "Recurrencia")}:{" "}
+                    {item.rrule}
+                  </p>
+                  {item.exdates?.length > 0 && (
+                    <p className="break-words text-sm text-muted-foreground">
+                      {t(
+                        "Exception dates",
+                        "Datas de exceção",
+                        "Fechas de excepción",
+                      )}
+                      : {item.exdates.join(", ")}
                     </p>
                   )}
-                </>
-              )}
-              <p className="break-all text-sm text-muted-foreground">
-                {t("Recurrence", "Recorrência", "Recurrencia")}: {item.rrule}
-              </p>
-              {item.exdates?.length > 0 && (
-                <p className="break-words text-sm text-muted-foreground">
-                  {t(
-                    "Exception dates",
-                    "Datas de exceção",
-                    "Fechas de excepción",
-                  )}
-                  : {item.exdates.join(", ")}
-                </p>
-              )}
+                </div>
+              </details>
               {owned(props, item) && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
                   {"due_local" in item && (
                     <Button
                       type="button"
                       variant="outline"
+                      className="h-10 px-4"
                       disabled={disabled}
                       onClick={() => toggle(item)}
                     >
@@ -1012,7 +1049,8 @@ function SchedulePanel(props: FeatureProps & { kind: "chores" | "calendar" }) {
                   )}
                   <Button
                     type="button"
-                    variant="destructive"
+                    variant="ghost"
+                    className="h-10 px-4 text-destructive hover:text-destructive"
                     disabled={disabled}
                     onClick={() => {
                       state.setError(null);

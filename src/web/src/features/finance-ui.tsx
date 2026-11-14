@@ -25,7 +25,11 @@ export function FinanceError({
   const { t } = usePreferences();
   if (!error) return null;
   return (
-    <Alert variant="destructive" role="alert">
+    <Alert
+      variant="destructive"
+      role="alert"
+      className="rounded-xl border-destructive/35 bg-destructive/10 p-3.5 text-base"
+    >
       <AlertDescription>{error}</AlertDescription>
       {retry && (
         <Button variant="outline" onClick={retry}>
@@ -41,8 +45,10 @@ export function FinanceField({
 }: ComponentProps<typeof Input> & { label: string }) {
   const id = useId();
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="grid gap-1.5">
+      <Label htmlFor={id} className="text-base font-semibold">
+        {label}
+      </Label>
       <Input id={id} {...props} />
     </div>
   );
@@ -53,8 +59,10 @@ export function FinanceText({
 }: ComponentProps<typeof Textarea> & { label: string }) {
   const id = useId();
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="grid gap-1.5">
+      <Label htmlFor={id} className="text-base font-semibold">
+        {label}
+      </Label>
       <Textarea id={id} rows={4} {...props} />
     </div>
   );
@@ -82,21 +90,29 @@ export function FinanceDelete({
       }}
     >
       <AlertDialogContent>
-        <AlertDialogTitle>{title}</AlertDialogTitle>
+        <AlertDialogTitle className="font-heading text-[22px] font-semibold leading-tight">
+          {title}
+        </AlertDialogTitle>
         <AlertDialogDescription>
           {t(
             "This cannot be undone.",
-            "Esta ação não pode ser desfeita.",
-            "Esta acción no se puede deshacer.",
+            "Isso não pode ser desfeito.",
+            "Esto no se puede deshacer.",
           )}
         </AlertDialogDescription>
         <FinanceError error={action.error} />
         <AlertDialogFooter>
-          <Button variant="outline" disabled={action.busy} onClick={onCancel}>
+          <Button
+            variant="ghost"
+            className="text-primary"
+            disabled={action.busy}
+            onClick={onCancel}
+          >
             {t("Cancel", "Cancelar", "Cancelar")}
           </Button>
           <Button
-            variant="destructive"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
             disabled={action.busy}
             onClick={async () => {
               if (await action.run(onDelete)) onDeleted();

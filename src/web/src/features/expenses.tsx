@@ -3,15 +3,9 @@ import { api } from "@/lib/api";
 import { housePath } from "@/lib/features";
 import type { FeatureProps } from "@/lib/features";
 import { usePreferences } from "@/lib/preferences";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -59,21 +53,20 @@ function ExpensesHouse(props: FeatureProps) {
       aria-label={t("Expenses", "Despesas", "Gastos")}
       className="grid gap-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-2xl">
-          {t("Expenses", "Despesas", "Gastos")}
-        </h2>
-        {canCreate(props.role) && (
-          <Button
-            disabled={creatingBusy}
-            onClick={() => setCreating((value) => !value)}
-          >
-            {creating
-              ? t("Cancel", "Cancelar", "Cancelar")
-              : t("Add expense", "Adicionar despesa", "Añadir gasto")}
-          </Button>
-        )}
-      </div>
+      <h2 className="roomies-page-title">
+        {t("Expenses", "Despesas", "Gastos")}
+      </h2>
+      {canCreate(props.role) && (
+        <Button
+          className="my-2 h-12 w-full"
+          disabled={creatingBusy}
+          onClick={() => setCreating((value) => !value)}
+        >
+          {creating
+            ? t("Cancel", "Cancelar", "Cancelar")
+            : t("Add expense", "Adicionar despesa", "Añadir gasto")}
+        </Button>
+      )}
       {!canCreate(props.role) && (
         <p>
           {t(
@@ -84,13 +77,13 @@ function ExpensesHouse(props: FeatureProps) {
         </p>
       )}
       {creating && canCreate(props.role) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {t("New expense", "Nova despesa", "Nuevo gasto")}
+        <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
+          <CardHeader className="px-5">
+            <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
+              <h3>{t("New expense", "Nova despesa", "Nuevo gasto")}</h3>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-5">
             <ExpenseForm
               {...props}
               onBusy={setCreatingBusy}
@@ -111,36 +104,30 @@ function ExpensesHouse(props: FeatureProps) {
         <p>
           {t(
             "No expenses yet.",
-            "Ainda não há despesas.",
-            "Todavía no hay gastos.",
+            "Nenhuma despesa ainda.",
+            "Aún no hay gastos.",
           )}
         </p>
       ) : (
         resource.data?.map((expense) => (
           <article key={expense.id}>
-            <Card>
-              <CardHeader>
-                <CardTitle>
+            <Card className="gap-0 rounded-[18px] border py-5 shadow-(--card-shadow) ring-0">
+              <CardHeader className="px-5">
+                <CardTitle className="mb-2 pt-2 font-sans text-[19px] font-bold leading-normal tracking-[-0.1px]">
                   <h3>{expense.description}</h3>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3">
-                <p>
+              <CardContent className="px-5">
+                <p className="text-[15px] text-muted-foreground">
                   {financeDate(expense.date, locale)} · {money(expense.amount)}{" "}
-                  · {expense.payer_name}
+                  · {expense.payer_name} ·{" "}
+                  {expense.visibility === "private"
+                    ? t("Private", "Privada", "Privado")
+                    : t("Shared", "Compartilhada", "Compartido")}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
-                    {expense.visibility === "private"
-                      ? t("Private", "Privada", "Privado")
-                      : t("Shared", "Compartilhada", "Compartido")}
-                  </Badge>
-                  {expense.category && (
-                    <Badge variant="outline">{expense.category}</Badge>
-                  )}
-                </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
                   <Button
+                    className="h-10 px-4"
                     variant="outline"
                     onClick={() => setSelected(expense)}
                   >
@@ -154,7 +141,8 @@ function ExpensesHouse(props: FeatureProps) {
                   </Button>
                   {permitted(expense) && (
                     <Button
-                      variant="destructive"
+                      variant="ghost"
+                      className="h-10 px-4 text-destructive hover:text-destructive"
                       onClick={() => setDeleting(expense)}
                     >
                       {t("Delete", "Excluir", "Eliminar")}
@@ -223,18 +211,12 @@ function ExpenseDialog(
     >
       <DialogContent
         showCloseButton={false}
+        aria-describedby={undefined}
         className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
       >
-        <DialogTitle>
+        <DialogTitle className="font-heading text-[22px] font-semibold leading-tight">
           {t("Expense details", "Detalhes da despesa", "Detalles del gasto")}
         </DialogTitle>
-        <DialogDescription>
-          {t(
-            "Review the expense and its current splits.",
-            "Confira a despesa e a divisão atual.",
-            "Consulta el gasto y su reparto actual.",
-          )}
-        </DialogDescription>
         <FinanceError error={resource.error} retry={resource.reload} />
         {resource.loading ? (
           <p role="status">
@@ -243,56 +225,61 @@ function ExpenseDialog(
         ) : (
           detail && (
             <>
-              <p>
-                {detail.expense.payer_name} · {money(detail.expense.amount)} ·{" "}
-                {financeDate(detail.expense.date, locale)} ·{" "}
-                {detail.expense.visibility === "private"
-                  ? t("Private", "Privada", "Privado")
-                  : t("Shared", "Compartilhada", "Compartido")}
-              </p>
               {!editable && (
                 <>
                   <p>{detail.expense.description}</p>
                   {detail.expense.category && <p>{detail.expense.category}</p>}
                 </>
               )}
-              <Table
-                aria-label={t(
-                  "Current splits",
-                  "Divisão atual",
-                  "Reparto actual",
-                )}
-              >
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col">
-                      {t("Member", "Membro", "Miembro")}
-                    </TableHead>
-                    <TableHead scope="col">
-                      {t("Share", "Parte", "Parte")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.splits.map((split) => (
-                    <TableRow key={split.id}>
-                      <TableHead scope="row">
-                        {split.user_name ||
-                          props.members.find(
-                            (member) => member.user_id === split.user_id,
-                          )?.user_name ||
-                          split.user_id}
-                      </TableHead>
-                      <TableCell>{money(split.share_amount)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
               {editable && (
                 <div hidden={visibilityOpen}>
                   <ExpenseForm {...props} detail={detail} onBusy={setBusy} />
                 </div>
               )}
+              <details>
+                <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+                  {t("Current splits", "Divisão atual", "Reparto actual")}
+                </summary>
+                <p>
+                  {detail.expense.payer_name} · {money(detail.expense.amount)} ·{" "}
+                  {financeDate(detail.expense.date, locale)} ·{" "}
+                  {detail.expense.visibility === "private"
+                    ? t("Private", "Privada", "Privado")
+                    : t("Shared", "Compartilhada", "Compartido")}
+                </p>
+                <Table
+                  aria-label={t(
+                    "Current splits",
+                    "Divisão atual",
+                    "Reparto actual",
+                  )}
+                >
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead scope="col">
+                        {t("Member", "Membro", "Miembro")}
+                      </TableHead>
+                      <TableHead scope="col">
+                        {t("Share", "Parte", "Parte")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.splits.map((split) => (
+                      <TableRow key={split.id}>
+                        <TableHead scope="row">
+                          {split.user_name ||
+                            props.members.find(
+                              (member) => member.user_id === split.user_id,
+                            )?.user_name ||
+                            split.user_id}
+                        </TableHead>
+                        <TableCell>{money(split.share_amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </details>
               {canChangeVisibility(
                 props.role,
                 detail.expense.payer_id === props.user.id,
@@ -327,9 +314,16 @@ function ExpenseDialog(
             </>
           )
         )}
-        <Button variant="outline" disabled={busy} onClick={props.onClose}>
-          {t("Close", "Fechar", "Cerrar")}
-        </Button>
+        {(!editable || visibilityOpen) && (
+          <Button
+            variant="ghost"
+            className="justify-self-end text-primary"
+            disabled={busy}
+            onClick={props.onClose}
+          >
+            {t("Close", "Fechar", "Cerrar")}
+          </Button>
+        )}
       </DialogContent>
     </Dialog>
   );
