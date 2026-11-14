@@ -49,7 +49,10 @@ void main() {
 
   testWidgets('validates empty fields before making a request', (tester) async {
     var calls = 0;
-    await pumpLogin(tester, MockClient((_) async {
+    await pumpLogin(tester, MockClient((request) async {
+      if (request.url.path == '/api/auth/config') {
+        return http.Response('{}', 200);
+      }
       calls++;
       return http.Response('{}', 200);
     }));

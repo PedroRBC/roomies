@@ -40,6 +40,7 @@ export async function api<T>(
 }
 
 export interface User {
+  two_factor_enabled?: boolean;
   id: string;
   name: string;
   email: string;

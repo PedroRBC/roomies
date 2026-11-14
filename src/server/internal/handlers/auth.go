@@ -22,13 +22,25 @@ type AuthHandler struct {
 	publicBaseURL string
 	limiter       *middleware.WindowLimiter
 	accountLimit  *middleware.WindowLimiter
+	native        nativeSignIns
 }
 
 func NewAuthHandler(users *repository.UserRepository, auth *betterauth.Client, publicURL string) *AuthHandler {
 	return &AuthHandler{userRepo: users, auth: auth, publicBaseURL: publicURL, limiter: middleware.NewWindowLimiter(time.Minute), accountLimit: middleware.NewWindowLimiter(15 * time.Minute)}
 }
 func (h *AuthHandler) Config(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"provider": "better-auth", "password": true})
+	google := false
+	if res, err := h.auth.Do(r.Context(), "GET", "/roomies-config", nil, r); err == nil {
+		defer res.Body.Close()
+		var config struct {
+			Google bool `json:"google"`
+		}
+		if res.StatusCode == 200 {
+			_ = json.NewDecoder(io.LimitReader(res.Body, 1024)).Decode(&config)
+			google = config.Google
+		}
+	}
+	writeJSON(w, 200, map[string]any{"provider": "better-auth", "password": true, "google": google, "two_factor": true})
 }
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) { h.authenticate(w, r, true) }
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request)    { h.authenticate(w, r, false) }
@@ -84,25 +96,55 @@ func (h *AuthHandler) authenticate(w http.ResponseWriter, r *http.Request, regis
 		h.authError(w, res)
 		return
 	}
-	var result models.AuthResponse
-	if err := json.NewDecoder(io.LimitReader(res.Body, maxRequestBodyBytes)).Decode(&result); err != nil || result.Token == "" || result.User.ID == "" {
+	h.sessionResponse(w, r, res, status)
+}
+
+func (h *AuthHandler) sessionResponse(w http.ResponseWriter, r *http.Request, res *http.Response, status int) {
+	var result struct {
+		models.AuthResponse
+		TwoFactorRedirect bool `json:"twoFactorRedirect"`
+	}
+	if err := json.NewDecoder(io.LimitReader(res.Body, maxRequestBodyBytes)).Decode(&result); err != nil {
 		h.unavailable(w)
 		return
 	}
-	user, err := h.userRepo.GetByID(r.Context(), result.User.ID)
+	copyAuthCookies(w, res)
+	if result.TwoFactorRedirect {
+		body := map[string]any{"two_factor_required": true}
+		if !isWeb(r) {
+			for _, c := range res.Cookies() {
+				if strings.TrimPrefix(c.Name, "__Secure-") == "roomies_two_factor" && c.MaxAge >= 0 {
+					body["challenge"] = c.Value
+				}
+			}
+		}
+		writeJSON(w, 200, body)
+		return
+	}
+	if result.Token == "" || result.User.ID == "" {
+		h.unavailable(w)
+		return
+	}
+	if rotated := res.Header.Get("set-auth-token"); rotated != "" {
+		result.Token = rotated
+	}
+	h.writeSession(w, r, result.Token, result.User.ID, status)
+}
+func isWeb(r *http.Request) bool { return strings.EqualFold(r.Header.Get("X-Roomies-Client"), "web") }
+func (h *AuthHandler) writeSession(w http.ResponseWriter, r *http.Request, token, userID string, status int) {
+	user, err := h.userRepo.GetByID(r.Context(), userID)
 	if err != nil {
 		h.unavailable(w)
 		return
 	}
-	result.User = *user
-	copyAuthCookies(w, res)
 	setCookie(w, middleware.SessionHintCookieName, "1", 8*60*60, false, h.secureCookie(r))
-	if strings.EqualFold(r.Header.Get("X-Roomies-Client"), "web") {
-		writeJSON(w, status, map[string]any{"user": result.User})
+	if isWeb(r) {
+		writeJSON(w, status, map[string]any{"user": user})
 		return
 	}
-	writeJSON(w, status, result)
+	writeJSON(w, status, models.AuthResponse{Token: token, User: *user})
 }
+
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if !h.allowedOrigin(w, r) {
 		return
@@ -138,7 +180,7 @@ func (h *AuthHandler) allowedOrigin(w http.ResponseWriter, r *http.Request) bool
 	}
 	return true
 }
-func (h *AuthHandler) authError(w http.ResponseWriter, res *http.Response) {
+func (h *AuthHandler) authError(w http.ResponseWriter, res *http.Response, invalidMessage ...string) {
 	status := res.StatusCode
 	if status == 429 {
 		h.tooMany(w)
@@ -155,6 +197,9 @@ func (h *AuthHandler) authError(w http.ResponseWriter, res *http.Response) {
 	message := "authentication failed"
 	if status == 401 {
 		message = "invalid email or password"
+		if len(invalidMessage) > 0 {
+			message = invalidMessage[0]
+		}
 	} else if status == 422 || status == 409 {
 		message = "an account with this email already exists"
 	} else if result.Message != "" {
@@ -174,7 +219,7 @@ func (h *AuthHandler) secureCookie(r *http.Request) bool {
 }
 func copyAuthCookies(w http.ResponseWriter, res *http.Response) {
 	for _, cookie := range res.Cookies() {
-		if cookie.Name == middleware.SessionCookieName || cookie.Name == "__Secure-"+middleware.SessionCookieName {
+		if betterauth.IsAuthCookie(cookie.Name) {
 			http.SetCookie(w, cookie)
 		}
 	}

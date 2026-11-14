@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { bearer } from "better-auth/plugins/bearer";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { compare } from "bcryptjs";
@@ -7,6 +8,7 @@ import type { Pool } from "pg";
 interface Config {
   publicURL: string;
   secret: string;
+  google?: { clientId: string; clientSecret: string };
 }
 const developmentSecret =
   "roomies-local-development-secret-change-before-hosting";
@@ -30,16 +32,39 @@ export function readConfig(env: NodeJS.ProcessEnv): Config {
       "BETTER_AUTH_SECRET must contain at least 32 characters; generate one with openssl rand -hex 48",
     );
   }
-  return { publicURL, secret };
+  const clientId = env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!!clientId !== !!clientSecret)
+    throw new Error("Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET");
+  return {
+    publicURL,
+    secret,
+    google: clientId && clientSecret ? { clientId, clientSecret } : undefined,
+  };
 }
 
 export function createRoomiesAuth(database: Pool, config: Config) {
+  const factor = twoFactor({
+    issuer: "Roomies",
+    allowPasswordless: true,
+    twoFactorTable: "auth_two_factor",
+    schema: { user: { fields: { twoFactorEnabled: "two_factor_enabled" } } },
+  });
+  const gate = factor.hooks.after[0];
+  const credentialMatcher = gate.matcher;
+  // The Go callback forwards the challenge cookies and renders the second-factor form.
+  gate.matcher = (ctx) =>
+    credentialMatcher(ctx) || ctx.path === "/callback/:id";
   const auth = betterAuth({
     appName: "Roomies",
     baseURL: config.publicURL,
     secret: config.secret,
     database,
     trustedOrigins: [config.publicURL],
+    socialProviders: config.google
+      ? { google: { ...config.google, prompt: "select_account" } }
+      : {},
+    onAPIError: { errorURL: `${config.publicURL}/api/auth/google/finish` },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
@@ -84,7 +109,12 @@ export function createRoomiesAuth(database: Pool, config: Config) {
     account: { modelName: "auth_account", accountLinking: { enabled: false } },
     verification: { modelName: "auth_verification" },
     advanced: {
-      cookies: { session_token: { name: "roomies_session" } },
+      cookiePrefix: "roomies_auth",
+      cookies: {
+        session_token: { name: "roomies_session" },
+        two_factor: { name: "roomies_two_factor" },
+        oauth_state: { name: "roomies_oauth_state" },
+      },
       ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
     },
     rateLimit: {
@@ -93,7 +123,7 @@ export function createRoomiesAuth(database: Pool, config: Config) {
       max: 40,
       customRules: { "/get-session": false, "/sign-out": false },
     },
-    plugins: [bearer()],
+    plugins: [factor, bearer()],
     telemetry: { enabled: false },
   });
   const allowed = new Set([
@@ -102,11 +132,19 @@ export function createRoomiesAuth(database: Pool, config: Config) {
     "/api/auth/get-session",
     "/api/auth/sign-out",
     "/api/auth/ok",
+    "/api/auth/sign-in/social",
+    "/api/auth/callback/google",
+    "/api/auth/two-factor/enable",
+    "/api/auth/two-factor/disable",
+    "/api/auth/two-factor/verify-totp",
+    "/api/auth/two-factor/verify-backup-code",
   ]);
   return {
     handler: (request: Request) =>
-      allowed.has(new URL(request.url).pathname)
-        ? auth.handler(request)
-        : Promise.resolve(new Response(null, { status: 404 })),
+      new URL(request.url).pathname === "/api/auth/roomies-config"
+        ? Promise.resolve(Response.json({ google: !!config.google }))
+        : allowed.has(new URL(request.url).pathname)
+          ? auth.handler(request)
+          : Promise.resolve(new Response(null, { status: 404 })),
   };
 }

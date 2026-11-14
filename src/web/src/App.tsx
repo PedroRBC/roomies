@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Security } from "@/components/security";
 import { Auth } from "@/components/auth";
 import { Field } from "@/components/field";
 import { HouseWorkspace } from "@/components/house-workspace";
@@ -35,6 +36,7 @@ async function bootstrap() {
 }
 
 export default function App() {
+  const [security, setSecurity] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [houses, setHouses] = useState<House[]>([]);
   const [selected, setSelected] = useState("");
@@ -138,6 +140,7 @@ export default function App() {
             </span>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">{user.name}</span>
+              <Button variant="ghost" size="sm" onClick={() => setSecurity(!security)}>Account security</Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -157,6 +160,7 @@ export default function App() {
         </header>
       )}
       <main id="main" className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-9">
+        {user && security && <Security user={user} onChange={setUser} />}
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>

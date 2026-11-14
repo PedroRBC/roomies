@@ -7,6 +7,61 @@ class RoomiesStrings {
   static const supported = <String>['en', 'pt', 'es'];
 
   final String localeCode;
+  String get factorRecentLogin => _t(
+      'Optional if you signed in within the last 5 minutes.',
+      'Opcional se você entrou nos últimos 5 minutos.',
+      'Opcional si iniciaste sesión en los últimos 5 minutos.');
+  String get accountSecurity =>
+      _t('Account security', 'Segurança da conta', 'Seguridad de la cuenta');
+  String get authenticator => _t('Authenticator app', 'Aplicativo autenticador',
+      'Aplicación autenticadora');
+  String get factorDescription => _t(
+      'Use an app such as Google Authenticator, 1Password or Aegis.',
+      'Use um app como Google Authenticator, 1Password ou Aegis.',
+      'Usa una app como Google Authenticator, 1Password o Aegis.');
+  String get factorEnabled => _t(
+      'Two-factor authentication is enabled.',
+      'Autenticação de dois fatores ativada.',
+      'Autenticación de dos factores activada.');
+  String get factorCode => _t('Authenticator code', 'Código do autenticador',
+      'Código del autenticador');
+  String get recoveryCode =>
+      _t('Recovery code', 'Código de recuperação', 'Código de recuperación');
+  String get useRecovery => _t('Use a recovery code',
+      'Usar código de recuperação', 'Usar código de recuperación');
+  String get useAuthenticator => _t('Use authenticator app',
+      'Usar aplicativo autenticador', 'Usar aplicación autenticadora');
+  String get setupAuthenticator => _t('Set up authenticator',
+      'Configurar autenticador', 'Configurar autenticador');
+  String get confirmAuthenticator => _t('Confirm authenticator',
+      'Confirmar autenticador', 'Confirmar autenticador');
+  String get disableFactor => _t(
+      'Disable two-factor authentication',
+      'Desativar autenticação de dois fatores',
+      'Desactivar autenticación de dos factores');
+  String get scanAuthenticator => _t(
+      'Scan this QR code with your authenticator app, or enter the key below.',
+      'Escaneie este QR code no autenticador ou digite a chave abaixo.',
+      'Escanea este código QR con tu autenticador o introduce la clave.');
+  String get saveRecovery => _t(
+      'Save these recovery codes somewhere safe. Each can be used once if you lose your authenticator.',
+      'Guarde estes códigos em um local seguro. Cada um pode ser usado uma vez se perder o autenticador.',
+      'Guarda estos códigos en un lugar seguro. Cada uno se puede usar una vez si pierdes el autenticador.');
+  String get recoverySaved => _t(
+      'I saved my recovery codes',
+      'Guardei meus códigos de recuperação',
+      'Guardé mis códigos de recuperación');
+  String get factorPassword => _t(
+      'Current password (leave blank for Google-only accounts)',
+      'Senha atual (deixe em branco se usa apenas Google)',
+      'Contraseña actual (deja en blanco si solo usas Google)');
+  String get verifyCode => _t('Verify', 'Verificar', 'Verificar');
+  String get googleSignIn => _t(
+      'Continue with Google', 'Continuar com Google', 'Continuar con Google');
+  String get googleWaiting => _t(
+      'Finish sign-in in your browser, then return to Roomies.',
+      'Conclua a entrada no navegador e volte ao Roomies.',
+      'Completa el inicio de sesión en el navegador y vuelve a Roomies.');
 
   bool get isPortuguese => localeCode == 'pt';
   bool get isSpanish => localeCode == 'es';

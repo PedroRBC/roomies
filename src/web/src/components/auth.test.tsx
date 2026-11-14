@@ -24,3 +24,25 @@ it("registers and disables the form while submitting", async () => {
   await actor.click(screen.getByRole("button", { name: "Create account" }));
   expect(onLogin).toHaveBeenCalledWith(user);
 });
+
+it("does not sign in before TOTP and accepts a recovery code", async () => {
+  const { api } = await import("@/lib/api");
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "/auth/config") return { google: false };
+    if (path === "/auth/login") return { two_factor_required: true };
+    if (path === "/auth/two-factor/verify-backup-code") return { user };
+    throw new Error("Unexpected endpoint");
+  });
+  const onLogin = vi.fn(), actor = userEvent.setup();
+  render(<Auth onLogin={onLogin} />);
+  await actor.type(screen.getByLabelText("Email"), "alex@example.com");
+  await actor.type(screen.getByLabelText("Password"), "password123");
+  await actor.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(onLogin).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Authenticator code")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  await actor.click(screen.getByRole("button", { name: "Use a recovery code" }));
+  await actor.type(screen.getByLabelText("Recovery code"), "abcde-fghij");
+  await actor.click(screen.getByRole("button", { name: "Verify" }));
+  expect(onLogin).toHaveBeenCalledWith(user);
+});

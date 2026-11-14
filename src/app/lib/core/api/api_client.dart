@@ -75,7 +75,10 @@ void requireEncryptedApiBase(String baseUrl,
   throw StateError('ROOMIES_API_URL must use https:// (got $baseUrl)');
 }
 
+class TwoFactorRequired implements Exception {}
+
 class ApiClient {
+  String? _twoFactorChallenge;
   ApiClient({
     SessionStorage? storage,
     http.Client? httpClient,
@@ -122,6 +125,7 @@ class ApiClient {
   }
 
   void adoptCookieSession() {
+    _twoFactorChallenge = null;
     _generation++;
     _token = null;
     _cookieSession = true;
@@ -129,6 +133,7 @@ class ApiClient {
   }
 
   Future<void> _setToken(String token) async {
+    _twoFactorChallenge = null;
     if (kIsWeb || token.isEmpty) {
       adoptCookieSession();
       return;
@@ -152,6 +157,7 @@ class ApiClient {
   }
 
   Future<void> clearSession() async {
+    _twoFactorChallenge = null;
     _generation++;
     _token = null;
     _cookieSession = false;
@@ -249,11 +255,70 @@ class ApiClient {
         headers: _headers(),
         body: jsonEncode({'email': email, 'password': password}),
       ),
-      AuthResponse.fromJson,
+      (json) {
+        if (json['two_factor_required'] == true) {
+          _twoFactorChallenge = json['challenge'] as String?;
+          throw TwoFactorRequired();
+        }
+        return AuthResponse.fromJson(json);
+      },
       generation: gen,
     );
     await _setToken(result.token);
     return result;
+  }
+
+  Future<bool> googleAvailable() async => _send(
+        () => _http.get(Uri.parse('$baseUrl/auth/config'), headers: _headers()),
+        (json) => json['google'] == true,
+      );
+
+  Future<Map<String, dynamic>> startGoogle() => _send(
+        () => _http.post(
+            Uri.parse('$baseUrl/auth/${kIsWeb ? 'google' : 'native/start'}'),
+            headers: _headers()),
+        (json) => json,
+      );
+
+  Future<AuthResponse?> pollGoogle(Map<String, dynamic> flow) => _send(
+        () => _http.post(Uri.parse('$baseUrl/auth/native/poll'),
+            headers: _headers(),
+            body: jsonEncode({'id': flow['id'], 'verifier': flow['verifier']})),
+        (json) => json['pending'] == true ? null : AuthResponse.fromJson(json),
+      );
+
+  Future<void> adoptAuth(AuthResponse result) => _setToken(result.token);
+
+  Future<Map<String, dynamic>> twoFactor(String action,
+      {String? password, String? code, bool backup = false}) async {
+    final result = await _send(
+      () => _http.post(Uri.parse('$baseUrl/auth/two-factor/$action'),
+          headers: _headers(),
+          body: jsonEncode({
+            if (password != null) 'password': password,
+            if (code != null) 'code': code,
+            'backup': backup,
+            if (!_valid &&
+                _twoFactorChallenge != null &&
+                (action == 'verify-totp' || action == 'verify-backup-code'))
+              'challenge': _twoFactorChallenge,
+          })),
+      (json) => json,
+    );
+    if (result['token'] is String) await _setToken(result['token'] as String);
+    if (result['user'] != null) {
+      _twoFactorChallenge = null;
+      if (kIsWeb) adoptCookieSession();
+    }
+    return result;
+  }
+
+  Future<AuthResponse> verifyTwoFactor(String code,
+      {bool backup = false}) async {
+    final result = await twoFactor(
+        backup ? 'verify-backup-code' : 'verify-totp',
+        code: code);
+    return AuthResponse.fromJson(result);
   }
 
   Future<User> me() async {

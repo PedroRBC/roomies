@@ -26,7 +26,9 @@ type Session struct {
 		Email string `json:"email"`
 	} `json:"user"`
 	Session struct {
-		ID string `json:"id"`
+		ID        string    `json:"id"`
+		Token     string    `json:"token"`
+		CreatedAt time.Time `json:"createdAt"`
 	} `json:"session"`
 }
 
@@ -65,8 +67,8 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader, so
 	if auth := strings.TrimSpace(source.Header.Get("Authorization")); auth != "" {
 		req.Header.Set("Authorization", auth)
 	} else {
-		for _, name := range []string{"roomies_session", "__Secure-roomies_session"} {
-			if cookie, err := source.Cookie(name); err == nil {
+		for _, cookie := range source.Cookies() {
+			if IsAuthCookie(cookie.Name) {
 				req.AddCookie(cookie)
 			}
 		}
@@ -99,4 +101,13 @@ func (c *Client) GetSession(ctx context.Context, source *http.Request) (*Session
 		return nil, errors.New("invalid authentication service response")
 	}
 	return session, nil
+}
+
+func IsAuthCookie(name string) bool {
+	name = strings.TrimPrefix(name, "__Secure-")
+	switch name {
+	case "roomies_session", "roomies_two_factor", "roomies_oauth_state", "roomies_auth.state", "roomies_auth.dont_remember":
+		return true
+	}
+	return false
 }

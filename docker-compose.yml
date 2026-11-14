@@ -101,6 +101,8 @@ services:
     environment:
       DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD:-roomies}@db:5432/roomies
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL:-http://localhost:8080}
     volumes:
       - tls:/tls:ro

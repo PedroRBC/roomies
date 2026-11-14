@@ -25,7 +25,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	var user models.User
-	err := r.db.GetContext(ctx, &user, "SELECT id, name, email, password_hash, COALESCE(workos_user_id, '') AS workos_user_id, created_at FROM users WHERE id = $1", id)
+	err := r.db.GetContext(ctx, &user, "SELECT id, name, email, password_hash, two_factor_enabled, COALESCE(workos_user_id, '') AS workos_user_id, created_at FROM users WHERE id = $1", id)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
-	err := r.db.GetContext(ctx, &user, "SELECT id, name, email, password_hash, COALESCE(workos_user_id, '') AS workos_user_id, created_at FROM users WHERE email = $1", email)
+	err := r.db.GetContext(ctx, &user, "SELECT id, name, email, password_hash, two_factor_enabled, COALESCE(workos_user_id, '') AS workos_user_id, created_at FROM users WHERE email = $1", email)
 	if err != nil {
 		return nil, err
 	}

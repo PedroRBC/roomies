@@ -13,7 +13,7 @@ GoRouter createRouter(AppState appState) {
   return GoRouter(
     refreshListenable: appState,
     initialLocation: '/',
-    redirect: (context, state) {
+    redirect: (context, state) async {
       if (!appState.sessionReady) return null;
       final path = state.uri.path;
       final authed = appState.api.isAuthenticated;
@@ -24,6 +24,10 @@ GoRouter createRouter(AppState appState) {
           path == '/settings';
       if (!authed && !public) return '/';
       if (authed && (path == '/' || path == '/register')) {
+        final invitation = await appState.api.loadPendingInvitation();
+        if (invitation != null && invitation.isNotEmpty) {
+          return '/accept-invitation';
+        }
         // Fresh password login always goes to Dashboard via explicit
         // navigation. Restored sessions prefer the default house when set.
         return appState.restoredHomePath() ?? '/dashboard';

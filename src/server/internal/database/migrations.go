@@ -84,6 +84,18 @@ func migrations(driver string) []schemaMigration {
 			name:    "better_auth",
 			up:      execStatements(betterAuthStatements()...),
 		},
+		{version: 12, name: "auth_two_factor", up: execStatements(
+			`ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE`,
+			`CREATE TABLE auth_two_factor (
+                id TEXT PRIMARY KEY,
+                secret TEXT NOT NULL,
+                "backupCodes" TEXT NOT NULL,
+                "userId" TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                verified BOOLEAN NOT NULL DEFAULT TRUE,
+                "failedVerificationCount" INTEGER NOT NULL DEFAULT 0,
+                "lockedUntil" TIMESTAMP
+            )`,
+		)},
 	}
 }
 

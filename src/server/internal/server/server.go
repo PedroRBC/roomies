@@ -106,6 +106,14 @@ func NewHandler(deps Dependencies) http.Handler {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
 		r.Post("/logout", authHandler.Logout)
+		r.Post("/two-factor/{action}", authHandler.TwoFactor)
+		r.Post("/google", authHandler.Google)
+		r.Get("/google", authHandler.Google)
+		r.Get("/callback/google", authHandler.GoogleCallback)
+		r.Get("/google/finish", authHandler.GoogleFinish)
+		r.Post("/google/finish", authHandler.GoogleFinish)
+		r.Post("/native/start", authHandler.NativeStart)
+		r.Post("/native/poll", authHandler.NativePoll)
 	})
 
 	r.Group(func(r chi.Router) {

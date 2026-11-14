@@ -4,7 +4,7 @@ Roomies helps roommates manage shared expenses, notes, balances, and house-scope
 
 - **Apps:** web, Android, Windows, Linux (Flutter); alternative web client (Vite + React, shadcn/ui, Tailwind CSS)
 - **Server:** Go API + worker, Better Auth (TypeScript), PostgreSQL, behind Caddy
-- **Sign-in:** email/password through self-hosted Better Auth
+- **Sign-in:** email/password, optional Google OAuth, and authenticator app 2FA through self-hosted Better Auth
 
 You only need Docker (Podman works too); no clone of this repo.
 
@@ -82,6 +82,8 @@ services:
     environment:
       DATABASE_URL: postgres://roomies:${POSTGRES_PASSWORD}@db:5432/roomies
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       ROOMIES_PUBLIC_BASE_URL: ${ROOMIES_PUBLIC_BASE_URL}
     volumes:
       - tls:/tls:ro
@@ -141,7 +143,13 @@ Optional backend variables (email invitations, Web Push, FCM) are listed with co
 
 **Encryption in transit.** Browsers and apps reach Caddy over HTTPS when `SITE_ADDRESS` is a domain (HSTS is sent). Between containers, `tls-init` issues a private CA (kept across restarts, key readable by root only): Caddy reaches the API, the API reaches Better Auth, and all server services reach PostgreSQL over TLS with certificate checks; PostgreSQL rejects plaintext TCP connections. Invitation email requires STARTTLS or TLS (`SMTP_TLS`). Using an external PostgreSQL? Point `DATABASE_URL` at it with `sslmode=verify-full` (plus `sslrootcert=` for a private CA); production refuses any weaker mode, since only `verify-full` checks the server's certificate and hostname.
 
-**Authentication.** [Better Auth](https://better-auth.com) runs in the `auth` container and uses the same PostgreSQL database. Sign up and sign in with email and password; email verification and password recovery are disabled, so SMTP is not required for authentication. Browser sessions use HttpOnly cookies; native apps use bearer tokens. Signing out revokes the session immediately. Set `BETTER_AUTH_SECRET` to a private random value of at least 32 characters.
+**Authentication.** [Better Auth](https://better-auth.com) runs in the `auth` container and uses the same PostgreSQL database. Sign up and sign in with email and password; email verification and password recovery are disabled, so SMTP is not required for authentication. Browser sessions use HttpOnly cookies; native apps use bearer tokens. Signing out revokes the session immediately. Set `BETTER_AUTH_SECRET` to a private random value of at least 32 characters. Keep this secret stable and back it up securely: it encrypts authenticator secrets and recovery codes.
+
+**Google sign-in (optional).** Create a Web application OAuth client in Google Cloud, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, and register `{ROOMIES_PUBLIC_BASE_URL}/api/auth/callback/google` as an authorized redirect URI (for local development: `http://localhost:8080/api/auth/callback/google`). Restart the auth service after changing these values. The Google button appears when both values are configured. Existing password accounts remain intact; accounts with the same email are not linked automatically. Sign in using the method that created the account.
+
+**Authenticator app 2FA.** In Settings → Account security (or Account security in the alternative web client), set up an authenticator such as Google Authenticator, 1Password or Aegis. Scan the QR code or enter the setup key, save the single-use recovery codes, and confirm a 6-digit code to activate 2FA. Both password and Google sign-ins then require the second factor. No email or SMTP is involved. Disable 2FA with a current authenticator code (or an unused recovery code) and your password; Google-only accounts can leave the password blank. If you signed in within the last five minutes, you can leave the code blank, including after using your final recovery code. Recovery codes sign you in if the authenticator is lost. There is no email account recovery, so keep the recovery codes safe.
+
+On Android, Windows and Linux, Google opens in the system browser. Complete 2FA there if requested, confirm the displayed account, then return to Roomies. The app polls for a single-use handoff for up to five minutes; session tokens never appear in URLs. Restart sign-in if the API restarts during this handoff. Browser and native app share the resulting session, so signing out of that browser session revokes it in the app too.
 
 When upgrading, database migrations preserve existing local users, household memberships, and password hashes. Existing sessions end; sign in again with the same password. Accounts created only through WorkOS have no local password to migrate and cannot sign in until their credentials are imported; keep a backup before upgrading a WorkOS deployment.
 
